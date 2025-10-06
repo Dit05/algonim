@@ -1,3 +1,3 @@
 # Algonim
 
-*TODO*
+*My Thesis Project*
