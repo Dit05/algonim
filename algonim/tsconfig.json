@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+
+    "strict": true,
+    "outDir": "./build"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "build/*"
+  ],
+  "outDir": "./build",
+  "files": ["src/algonim.ts"]
+}
