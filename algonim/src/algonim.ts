@@ -28,10 +28,20 @@ class Algonim extends HTMLElement {
     console.log(`Attribute ${name} has changed from ${oldValue} to ${newValue}.`)
   }
 
+  redraw() {
+    console.log('Redraw called')
+  }
+
 }
 
 
+type ImperativeLine = () => void
+type ImperativeLines = { [key: number]: ImperativeLine }
+
 class ImperativeAlgorithm {
+
+  lines: ImperativeLines = {}
+
 }
 
 
@@ -64,6 +74,9 @@ class Drawer {
 
   public drawLine(startX: number, startY: number, endX: number, endY: number) {
     this.context.beginPath()
+    this.context.moveTo(startX, startY)
+    this.context.lineTo(endX, endY)
+    this.context.stroke()
   }
 
 }
