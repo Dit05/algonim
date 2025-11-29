@@ -7,7 +7,9 @@
   <body>
     <algonim-element color="#abcdef" shape="oblong toroid">:3</algonim-element>
     <script defer="defer">
-      document.getElementsByTagName('algonim-element')[0].redraw()
+      const alg = document.getElementsByTagName('algonim-element')[0]
+      setupExample(alg)
+      alg.redraw()
     </script>
   </body>
 </html>

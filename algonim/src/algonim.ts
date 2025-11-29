@@ -5,6 +5,7 @@ class Algonim extends HTMLElement {
   static observedAttributes = ["color", "shape"]
 
   canvas: HTMLCanvasElement
+  rootPane: Pane | null = null
 
 
   constructor() {
@@ -49,16 +50,9 @@ class Algonim extends HTMLElement {
     const drawer = new Drawer(ctx, new Region(0, 0, this.canvas.width, this.canvas.height))
     drawer.fill("white");
 
-    const split = new SplitPane()
-
-    {
-      const pane = new ModelPane()
-      const code = new CodeModel()
-      pane.model = code
-      split.second = code
+    if(this.rootPane !== null) {
+      this.rootPane.draw(drawer)
     }
-
-    split.draw(drawer)
 
     /*drawer.fill('#ff00ff')
     drawer = new Drawer(ctx, new Region(ctx.canvas.width / 4, ctx.canvas.height / 4, this.canvas.width / 2, this.canvas.height / 2))
@@ -232,7 +226,8 @@ class Drawer {
 
   public drawText(text: string, x: number, y: number, fillStyle: CanvasStyle) {
     this.doClipped(() => {
-      this.context.font = "48px sans" // TODO better
+      this.context.font = "24px sans" // TODO better
+      this.context.textBaseline = "top"
       this.context.fillStyle = fillStyle;
       this.context.fillText(text, x, y)
     })
@@ -257,10 +252,40 @@ class CodeModel extends Model {
   lines: string[] = []
 
   public draw(drawer: Drawer) {
-    drawer.drawText("foobar", 50, 90, "black")
+    let lineCount = 0
+    for(const line of this.lines) {
+      // TODO line up with starting whitespace
+      drawer.drawText(line, 10, (24 + 2) * lineCount, 'black')
+      lineCount++
+    }
   }
 
 }
 
 
+// Module setup
 customElements.define('algonim-element', Algonim)
+
+
+// HACK
+function setupExample(alg: Algonim) {
+  const root = new SplitPane()
+  alg.rootPane = root
+
+  const code = new CodeModel()
+  root.second = code
+
+  code.lines = [
+    'to_visit = { root }',
+    'while |to_visit| > 0 do',
+    '\tnext = to_visit.take_one()',
+    '\tif next->left <> NULL then',
+    '\t\tto_visit.add(next->left)',
+    '\tend',
+    '\tif next->right <> NULL then',
+    '\t\tto_visit.add(next->right)',
+    '\tend',
+    'done',
+  ]
+}
+
