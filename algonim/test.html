@@ -1,11 +1,22 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>test</title>
     <script src="dist/Algonim.js"></script>
   </head>
   <body>
-    <algonim-element color="#abcdef" shape="oblong toroid">:3</algonim-element>
+    <div style="margin: 0; padding: 0; width: 100%; height: 100vh;">
+      <algonim-element color="#abcdef" shape="oblong toroid">:3</algonim-element>
+    </div>
+
+    <footer>
+      <hr>
+      Algonim is licensed under the <a href="https://choosealicense.com/licenses/gpl-3.0/">GNU General Public License v3.0</a>.<br>
+      Source available at <a href="https://github.com/Dit05/algonim"><code>https://github.com/Dit05/algonim</code></a>.
+    </footer>
+
     <script defer="defer">
       const alg = document.getElementsByTagName('algonim-element')[0]
       console.log(alg)
