@@ -1,9 +1,16 @@
 {
   "compilerOptions": {
     "target": "es6",
+    "module": "es2020",
+
+    "outDir": "./dist/temp-js/",
+    "rootDir": "./src/",
+
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
 
     "strict": true,
-    "outDir": "./build"
+    "forceConsistentCasingInFileNames": true // Prevent M$ moments
   },
   "include": [
     "src/**/*.ts"
@@ -12,5 +19,5 @@
     "build/*"
   ],
   "outDir": "./build",
-  "files": ["src/algonim.ts"]
+  "files": ["src/Algonim.ts"]
 }

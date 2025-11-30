@@ -2,13 +2,14 @@
 <html>
   <head>
     <title>test</title>
-    <script src="build/algonim.js"></script>
+    <script src="dist/Algonim.js"></script>
   </head>
   <body>
     <algonim-element color="#abcdef" shape="oblong toroid">:3</algonim-element>
     <script defer="defer">
       const alg = document.getElementsByTagName('algonim-element')[0]
-      setupExample(alg)
+      console.log(alg)
+      alg.setupExample()
       alg.redraw()
     </script>
   </body>
