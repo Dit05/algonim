@@ -124,7 +124,7 @@ class SplitPane implements Pane {
       this.second.draw(secondDrawer)
     }
     const x = drawer.getLocalRegion().width * this.anchor
-    drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, 'black')
+    drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
   }
 }
 
@@ -151,7 +151,7 @@ class CodeModel extends Model {
     let lineCount = 0
     for(const line of this.lines) {
       // TODO line up with starting whitespace
-      drawer.drawText(line, 10, (24 + 2) * lineCount, 'black')
+      drawer.drawText(line, 10, (24 + 2) * lineCount, { align: 'start', baseline: 'top' }, { fill: 'black' })
       lineCount++
     }
   }
