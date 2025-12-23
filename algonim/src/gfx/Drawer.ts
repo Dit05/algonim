@@ -61,23 +61,59 @@ export class Drawer {
     this.context.restore()
   }
 
-  applyLineStyle(style: LineStyle) {
-    this.context.strokeStyle = style.stroke
-    this.context.lineWidth = style.lineWidth
-    this.context.lineCap = style.lineCap
-    this.context.lineJoin = style.lineJoin
-    this.context.miterLimit = style.miterLimit
-    this.context.setLineDash(style.lineDash)
-    this.context.lineDashOffset = style.lineDashOffset
+  applyLineStyle(style: Partial<LineStyle>) {
+    const effectiveStyle: LineStyle = { ...Drawer.defaultLineStyle, ...style }
+    this.context.strokeStyle = effectiveStyle.stroke
+    this.context.lineWidth = effectiveStyle.lineWidth
+    this.context.lineCap = effectiveStyle.lineCap
+    this.context.lineJoin = effectiveStyle.lineJoin
+    this.context.miterLimit = effectiveStyle.miterLimit
+    this.context.setLineDash(effectiveStyle.lineDash)
+    this.context.lineDashOffset = effectiveStyle.lineDashOffset
   }
 
-  // TODO customizable line
-  public drawLine(startX: number, startY: number, endX: number, endY: number, lineStyle: Partial<LineStyle>) {
+  applyTextAlign(align: Partial<TextAlign>) {
+    const effectiveAlign: TextAlign = { ...Drawer.defaultTextAlign, ...align }
+    this.context.textAlign = effectiveAlign.align
+    this.context.textBaseline = effectiveAlign.baseline
+  }
+
+  applyFontStyle(style: Partial<FontStyle>) {
+    const effectiveStyle: FontStyle = { ...Drawer.defaultFontStyle, ...style }
+    this.context.font = effectiveStyle.font
+    this.context.fontKerning = effectiveStyle.fontKerning
+    this.context.fontStretch = effectiveStyle.fontStretch
+    this.context.fontVariantCaps = effectiveStyle.fontVariantCaps
+    this.context.textBaseline = effectiveStyle.textBaseline
+    this.context.letterSpacing = effectiveStyle.letterSpacing
+
+    if(effectiveStyle.fill !== null) {
+      this.context.fillStyle = effectiveStyle.fill
+    }
+    if(effectiveStyle.line !== null) {
+      this.applyLineStyle(effectiveStyle.line)
+    }
+  }
+
+  public drawLine(startX: number, startY: number, endX: number, endY: number, style: Partial<LineStyle>) {
+    this.drawMultiLine([{x: startX, y: startY}, {x: endX, y: endY}], style)
+  }
+
+  public drawMultiLine(points: Iterable<{x: number, y: number}>, style: Partial<LineStyle>) {
     this.doClipped(() => {
       this.context.beginPath()
-      this.context.moveTo(startX, startY)
-      this.context.lineTo(endX, endY)
-      this.applyLineStyle({ ...Drawer.defaultLineStyle, ...lineStyle })
+      this.applyLineStyle(style)
+
+      let first = true
+      for(let point of points) {
+        if(first) {
+          this.context.moveTo(point.x, point.y)
+          first = false
+        } else {
+          this.context.lineTo(point.x, point.y)
+        }
+      }
+
       this.context.stroke()
     })
   }
@@ -85,30 +121,34 @@ export class Drawer {
   public drawText(text: string, x: number, y: number, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
     // TODO account for non-individually customizable stuff like textRendering
     const effectiveStyle: FontStyle = { ...Drawer.defaultFontStyle, ...style }
-    const effectiveAlign: TextAlign = { ...Drawer.defaultTextAlign, ...align }
 
     this.doClipped(() => {
-      // Apply font style
-      this.context.font = effectiveStyle.font
-      this.context.fontKerning = effectiveStyle.fontKerning
-      this.context.fontStretch = effectiveStyle.fontStretch
-      this.context.fontVariantCaps = effectiveStyle.fontVariantCaps
-      this.context.textBaseline = effectiveStyle.textBaseline
-      this.context.letterSpacing = effectiveStyle.letterSpacing
-
-      // Apply text align
-      this.context.textAlign = effectiveAlign.align
-      this.context.textBaseline = effectiveAlign.baseline
+      this.applyFontStyle(style)
+      this.applyTextAlign(align)
 
       if(effectiveStyle.fill !== null) {
-        this.context.fillStyle = effectiveStyle.fill
         this.context.fillText(text, x, y)
       }
       if(effectiveStyle.line !== null) {
-        this.applyLineStyle(effectiveStyle.line)
         this.context.strokeText(text, x, y)
       }
     })
+  }
+
+  public measureText(text: string, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}): TextMetrics {
+    let measured: TextMetrics | null = null
+
+    this.doClipped(() => {
+      this.applyFontStyle(style)
+      this.applyTextAlign(align)
+      measured = this.context.measureText(text)
+    })
+
+    if(measured === null) {
+      throw Error("doClipped did not invoke the passed-in lambda")
+    }
+
+    return measured
   }
 
   public fill(fillStyle: DrawStyle) {
