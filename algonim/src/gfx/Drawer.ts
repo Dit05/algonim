@@ -145,7 +145,7 @@ export class Drawer {
     })
 
     if(measured === null) {
-      throw Error("doClipped did not invoke the passed-in lambda")
+      throw Error("doClipped did not invoke the passed-in lambda.")
     }
 
     return measured

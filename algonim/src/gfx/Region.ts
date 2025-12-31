@@ -32,10 +32,10 @@ export class Region {
     endFac = Math.min(endFac, 1)
     startFac = Math.min(Math.max(startFac, 0), endFac)
     return Region.fromStartEnd(
-      this.x + startFac * this.width,
-      this.y,
-      this.x + endFac * this.width,
-      this.y + this.height
+      this.x,
+      this.y + startFac * this.height,
+      this.x + this.width,
+      this.y + endFac * this.height
     )
   }
 
@@ -43,10 +43,10 @@ export class Region {
     endFac = Math.min(endFac, 1)
     startFac = Math.min(Math.max(startFac, 0), endFac)
     return Region.fromStartEnd(
-      this.x,
-      this.y + startFac * this.height,
-      this.x + this.width,
-      this.y + endFac * this.height
+      this.x + startFac * this.width,
+      this.y,
+      this.x + endFac * this.width,
+      this.y + this.height
     )
   }
 

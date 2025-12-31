@@ -8,6 +8,10 @@
 
     "moduleResolution": "bundler",
     "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
 
     "strict": true,
     "forceConsistentCasingInFileNames": true // Prevent M$ moments

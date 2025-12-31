@@ -1,5 +1,7 @@
-import { Region } from './gfx/Region'
-import { Drawer } from './gfx/Drawer'
+import { Region } from '@/gfx/Region'
+import { Drawer } from '@/gfx/Drawer'
+import { Model } from '@/models/Model'
+import * as Models from '@/models'
 
 
 export class Algonim extends HTMLElement {
@@ -8,6 +10,11 @@ export class Algonim extends HTMLElement {
 
   canvas: HTMLCanvasElement
   rootPane: Pane | null = null
+
+  static models: { [key: string]: () => Model } = {
+    code: () => new Models.Code(),
+    tree: () => new Models.Tree()
+  }
 
 
   constructor() {
@@ -47,7 +54,7 @@ export class Algonim extends HTMLElement {
 
     const CONTEXT_ID = '2d'
     const ctx = this.canvas.getContext(CONTEXT_ID)
-    if(ctx === null) throw new ReferenceError(`canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode`)
+    if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
 
     const drawer = new Drawer(ctx, new Region(0, 0, this.canvas.width, this.canvas.height))
     drawer.fill("white");
@@ -62,25 +69,30 @@ export class Algonim extends HTMLElement {
     drawer.drawLine(0, 0, 800, 800, "black") // SEE: this line is clipped to the small area*/
   }
 
-  public setupExample() {
-    const root = new SplitPane()
-    this.rootPane = root
+  // TODO better name
+  // TODO inbetweening
+  public async animateFunction(func: (alg: Algonim) => Promise<void>): Promise<void> {
+    await func(this)
 
-    const code = new CodeModel()
-    root.second = code
+    return Promise.resolve()
+  }
 
-    code.lines = [
-      'to_visit = { root }',
-      'while |to_visit| > 0 do',
-      '\tnext = to_visit.take_one()',
-      '\tif next->left <> NULL then',
-      '\t\tto_visit.add(next->left)',
-      '\tend',
-      '\tif next->right <> NULL then',
-      '\t\tto_visit.add(next->right)',
-      '\tend',
-      'done',
-    ]
+  public async keyframe() {
+    console.log('keyframe')
+    this.redraw()
+    return new Promise((resolve) => {
+      setTimeout(resolve, 1000)
+    })
+  }
+
+  // TODO instead of adding models manually, parse a nested object that represents the panes
+  public createModel(name: string): Model {
+    return Algonim.models[name]()
+  }
+
+  public setRoot(model: Model) {
+    let pane = this.rootPane = new ModelPane()
+    pane.model = model
   }
 
 }
@@ -114,48 +126,32 @@ class SplitPane implements Pane {
 
 
   public draw(drawer: Drawer) {
-    // TODO axis
+    let split
+    switch(this.axis) {
+      case Axis.Horizontal: split = (r: Region, start: number, end: number) => r.hsplit(start, end); break
+      case Axis.Vertical: split = (r: Region, start: number, end: number) => r.vsplit(start, end); break
+    }
+
     if(this.first !== null) {
-      const firstDrawer = drawer.subregion(drawer.getLocalRegion().hsplit(0.0, this.anchor))
+      const firstDrawer = drawer.subregion(split(drawer.getLocalRegion(), 0.0, this.anchor))
       this.first.draw(firstDrawer)
     }
     if(this.second !== null) {
-      const secondDrawer = drawer.subregion(drawer.getLocalRegion().hsplit(this.anchor, 1.0))
+      const secondDrawer = drawer.subregion(split(drawer.getLocalRegion(), this.anchor, 1.0))
       this.second.draw(secondDrawer)
     }
-    const x = drawer.getLocalRegion().width * this.anchor
-    drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
-  }
-}
 
-
-type ImperativeLine = () => void
-type ImperativeLines = { [key: number]: ImperativeLine }
-
-class ImperativeAlgorithm {
-
-  lines: ImperativeLines = {}
-
-}
-
-
-abstract class Model {
-  public abstract draw(drawer: Drawer): void
-}
-
-class CodeModel extends Model {
-
-  lines: string[] = []
-
-  public draw(drawer: Drawer) {
-    let lineCount = 0
-    for(const line of this.lines) {
-      // TODO line up with starting whitespace
-      drawer.drawText(line, 10, (24 + 2) * lineCount, { align: 'start', baseline: 'top' }, { fill: 'black' })
-      lineCount++
+    switch(this.axis) {
+      case Axis.Horizontal:
+        const y = drawer.getLocalRegion().height * this.anchor
+        drawer.drawLine(0, y, drawer.getLocalRegion().width, y, { stroke: 'black' })
+        break
+      case Axis.Vertical:
+        const x = drawer.getLocalRegion().width * this.anchor
+        drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
+        break
     }
   }
-
 }
 
 

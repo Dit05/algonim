@@ -18,10 +18,41 @@
     </footer>
 
     <script defer="defer">
-      const alg = document.getElementsByTagName('algonim-element')[0]
-      console.log(alg)
-      alg.setupExample()
-      alg.redraw()
+      const algonim = document.getElementsByTagName('algonim-element')[0]
+
+      algonim.animateFunction(async (alg) => {
+        console.log(alg)
+
+        const code = alg.createModel('code')
+        code.lines = [
+          'i <- 3',
+          'while i>0 do',
+          '\tprint(i)',
+          '\ti <- i-1',
+          'done'
+        ]
+        code.arrowLine = 0
+
+        alg.setRoot(code)
+
+        await alg.keyframe()
+
+        let i = 3
+        while(i > 0) {
+          code.arrowLine = 1
+          await alg.keyframe()
+          code.arrowLine = 2
+          await alg.keyframe()
+          i -= 1
+          code.arrowLine = 3
+          await alg.keyframe()
+        }
+        code.arrowLine = 4
+        await alg.keyframe()
+      })
+
+      //alg.setupExample()
+      //alg.redraw()
     </script>
   </body>
 </html>
