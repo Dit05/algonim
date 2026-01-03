@@ -20,9 +20,7 @@
     <script defer="defer">
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
-      algonim.animateFunction(async (alg) => {
-        console.log(alg)
-
+      algonim.slideshow(async (alg) => {
         const code = alg.createModel('code')
         code.lines = [
           'i <- 3',
@@ -31,9 +29,20 @@
           '\ti <- i-1',
           'done'
         ]
+
+        let layout = {
+          'split': 'vertical',
+          'left': null,
+          'right': {
+            'split': 'horizontal',
+            'top': code,
+            'bottom': null
+          }
+        }
+
         code.arrowLine = 0
 
-        alg.setRoot(code)
+        alg.setLayout(layout)
 
         await alg.keyframe()
 

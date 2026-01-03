@@ -11,7 +11,7 @@ export class Algonim extends HTMLElement {
   canvas: HTMLCanvasElement
   rootPane: Pane | null = null
 
-  static models: { [key: string]: () => Model } = {
+  static modelConstructors: { [key: string]: () => Model } = {
     code: () => new Models.Code(),
     tree: () => new Models.Tree()
   }
@@ -69,33 +69,61 @@ export class Algonim extends HTMLElement {
     drawer.drawLine(0, 0, 800, 800, "black") // SEE: this line is clipped to the small area*/
   }
 
-  // TODO better name
-  // TODO inbetweening
-  public async animateFunction(func: (alg: Algonim) => Promise<void>): Promise<void> {
+  // TODO? inbetweening
+  public async slideshow(func: (alg: Algonim) => Promise<void>): Promise<void> {
     await func(this)
 
     return Promise.resolve()
   }
 
   public async keyframe() {
-    console.log('keyframe')
     this.redraw()
     return new Promise((resolve) => {
       setTimeout(resolve, 1000)
     })
   }
 
-  // TODO instead of adding models manually, parse a nested object that represents the panes
   public createModel(name: string): Model {
-    return Algonim.models[name]()
+    return Algonim.modelConstructors[name]()
   }
 
-  public setRoot(model: Model) {
-    let pane = this.rootPane = new ModelPane()
-    pane.model = model
+
+  static layoutToPane(layout: Layout, depthLimit: number): Pane {
+    if(depthLimit <= 0) {
+      throw new Error('Depth limit reached while scanning layout.')
+    }
+
+    if(layout instanceof Model) {
+      const pane = new ModelPane()
+      pane.model = layout
+      return pane
+    } else if(layout.split === 'horizontal') {
+      const pane = new SplitPane()
+      pane.axis = layout.split
+      pane.first = layout.top !== null ? Algonim.layoutToPane(layout.top, depthLimit - 1) : null
+      pane.second = layout.bottom !== null ? Algonim.layoutToPane(layout.bottom, depthLimit - 1) : null
+      return pane
+    } else if(layout.split === 'vertical') {
+      const pane = new SplitPane()
+      pane.axis = layout.split
+      pane.first = layout.left !== null ? Algonim.layoutToPane(layout.left, depthLimit - 1) : null
+      pane.second = layout.right !== null ? Algonim.layoutToPane(layout.right, depthLimit - 1) : null
+      return pane
+    } else {
+      throw new TypeError('Invalid layout.')
+    }
+  }
+
+  public setLayout(layout: Layout) {
+    this.rootPane = Algonim.layoutToPane(layout, 50)
   }
 
 }
+
+type Layout = Model
+  | { 'split': 'horizontal', 'top': Layout | null, 'bottom': Layout | null }
+  | { 'split': 'vertical', 'left': Layout | null, 'right': Layout | null }
+
 
 
 abstract class Pane {
@@ -112,13 +140,9 @@ class ModelPane implements Pane {
   }
 }
 
-enum Axis {
-  Horizontal,
-  Vertical
-}
 
 class SplitPane implements Pane {
-  axis: Axis = Axis.Horizontal
+  axis: 'horizontal' | 'vertical' = 'horizontal'
   anchor: number = 0.5
 
   first: Pane | null = null
@@ -128,26 +152,28 @@ class SplitPane implements Pane {
   public draw(drawer: Drawer) {
     let split
     switch(this.axis) {
-      case Axis.Horizontal: split = (r: Region, start: number, end: number) => r.hsplit(start, end); break
-      case Axis.Vertical: split = (r: Region, start: number, end: number) => r.vsplit(start, end); break
+      case 'horizontal': split = (r: Region, start: number, end: number) => r.hsplit(start, end); break
+      case 'vertical': split = (r: Region, start: number, end: number) => r.vsplit(start, end); break
     }
 
     if(this.first !== null) {
-      const firstDrawer = drawer.subregion(split(drawer.getLocalRegion(), 0.0, this.anchor))
+      let subregion = split(drawer.getLocalRegion(), 0.0, this.anchor)
+      const firstDrawer = drawer.subregion(subregion)
       this.first.draw(firstDrawer)
     }
     if(this.second !== null) {
-      const secondDrawer = drawer.subregion(split(drawer.getLocalRegion(), this.anchor, 1.0))
+      let subregion = split(drawer.getLocalRegion(), this.anchor, 1.0)
+      const secondDrawer = drawer.subregion(subregion)
       this.second.draw(secondDrawer)
     }
 
     switch(this.axis) {
-      case Axis.Horizontal:
-        const y = drawer.getLocalRegion().height * this.anchor
+      case 'horizontal':
+        const y = Math.round(drawer.getLocalRegion().height * this.anchor)
         drawer.drawLine(0, y, drawer.getLocalRegion().width, y, { stroke: 'black' })
         break
-      case Axis.Vertical:
-        const x = drawer.getLocalRegion().width * this.anchor
+      case 'vertical':
+        const x = Math.round(drawer.getLocalRegion().width * this.anchor)
         drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
         break
     }

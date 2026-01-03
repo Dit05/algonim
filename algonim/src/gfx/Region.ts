@@ -33,9 +33,9 @@ export class Region {
     startFac = Math.min(Math.max(startFac, 0), endFac)
     return Region.fromStartEnd(
       this.x,
-      this.y + startFac * this.height,
+      this.y + Math.floor(startFac * this.height),
       this.x + this.width,
-      this.y + endFac * this.height
+      this.y + Math.ceil(endFac * this.height)
     )
   }
 
@@ -43,17 +43,13 @@ export class Region {
     endFac = Math.min(endFac, 1)
     startFac = Math.min(Math.max(startFac, 0), endFac)
     return Region.fromStartEnd(
-      this.x + startFac * this.width,
+      this.x + Math.floor(startFac * this.width),
       this.y,
-      this.x + endFac * this.width,
+      this.x + Math.ceil(endFac * this.width),
       this.y + this.height
     )
   }
 
-
-  public offset(x: number, y: number): Region {
-    return new Region(this.x + x, this.y + y, this.width, this.height)
-  }
 
   public clippedBy(clip: Region): Region {
     const startX = Math.max(this.x, clip.x)
@@ -61,6 +57,24 @@ export class Region {
     const endX = Math.min(this.x + this.width, clip.x + clip.width)
     const endY = Math.min(this.y + this.height, clip.y + clip.height)
     return Region.fromStartEnd(startX, startY, endX, endY)
+  }
+
+
+  public applyToAll(fn: (arg0: number) => number): Region {
+    return new Region(fn(this.x), fn(this.y), fn(this.width), fn(this.height))
+  }
+
+  public applyToPosition(fn: (arg0: number) => number): Region {
+    return new Region(fn(this.x), fn(this.y), this.width, this.height)
+  }
+
+  public applyToSize(fn: (arg0: number) => number): Region {
+    return new Region(this.x, this.y, fn(this.width), fn(this.height))
+  }
+
+
+  public offset(x: number, y: number): Region {
+    return new Region(this.x + x, this.y + y, this.width, this.height)
   }
 
 }
