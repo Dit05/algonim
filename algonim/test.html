@@ -22,21 +22,26 @@
 
       algonim.slideshow(async (alg) => {
         const code = alg.createModel('code')
-        code.lines = [
+        code.setLines([
           'i <- 3',
           'while i>0 do',
           '\tprint(i)',
           '\ti <- i-1',
           'done'
-        ]
+        ])
+
+        const fakeConsole = alg.createModel('code')
+        const outputLines = [ 'Output: (totally not a CodeModel)' ]
+        fakeConsole.setLines(outputLines)
 
         let layout = {
           'split': 'vertical',
+          'ratio': 0.35,
           'left': null,
           'right': {
             'split': 'horizontal',
             'top': code,
-            'bottom': null
+            'bottom': fakeConsole
           }
         }
 
@@ -47,16 +52,31 @@
         await alg.keyframe()
 
         let i = 3
+        const iSign = code.createSign(0)
+        iSign.text = `${i}`
+
+        code.arrowLine = 1
+        await alg.keyframe()
         while(i > 0) {
-          code.arrowLine = 1
-          await alg.keyframe()
           code.arrowLine = 2
           await alg.keyframe()
+          outputLines.push(`${i}`)
+          fakeConsole.setLines(outputLines)
+          await alg.keyframe()
           i -= 1
+          iSign.text = `${i}`
           code.arrowLine = 3
+          await alg.keyframe()
+          code.arrowLine = 1
           await alg.keyframe()
         }
         code.arrowLine = 4
+        await alg.keyframe()
+
+        code.arrowLine = null
+        await alg.keyframe()
+
+        code.createSign(4).text = 'Fin.'
         await alg.keyframe()
       })
 

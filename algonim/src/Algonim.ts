@@ -100,14 +100,16 @@ export class Algonim extends HTMLElement {
     } else if(layout.split === 'horizontal') {
       const pane = new SplitPane()
       pane.axis = layout.split
-      pane.first = layout.top !== null ? Algonim.layoutToPane(layout.top, depthLimit - 1) : null
-      pane.second = layout.bottom !== null ? Algonim.layoutToPane(layout.bottom, depthLimit - 1) : null
+      if(layout.ratio !== undefined) pane.ratio = layout.ratio
+      pane.first = layout.top !== undefined && layout.top !== null ? Algonim.layoutToPane(layout.top, depthLimit - 1) : null
+      pane.second = layout.bottom !== undefined && layout.bottom !== null ? Algonim.layoutToPane(layout.bottom, depthLimit - 1) : null
       return pane
     } else if(layout.split === 'vertical') {
       const pane = new SplitPane()
       pane.axis = layout.split
-      pane.first = layout.left !== null ? Algonim.layoutToPane(layout.left, depthLimit - 1) : null
-      pane.second = layout.right !== null ? Algonim.layoutToPane(layout.right, depthLimit - 1) : null
+      if(layout.ratio !== undefined) pane.ratio = layout.ratio
+      pane.first = layout.left !== undefined && layout.left !== null ? Algonim.layoutToPane(layout.left, depthLimit - 1) : null
+      pane.second = layout.right !== undefined && layout.right !== null ? Algonim.layoutToPane(layout.right, depthLimit - 1) : null
       return pane
     } else {
       throw new TypeError('Invalid layout.')
@@ -121,8 +123,8 @@ export class Algonim extends HTMLElement {
 }
 
 type Layout = Model
-  | { 'split': 'horizontal', 'top': Layout | null, 'bottom': Layout | null }
-  | { 'split': 'vertical', 'left': Layout | null, 'right': Layout | null }
+  | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
+  | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
 
 
@@ -143,7 +145,7 @@ class ModelPane implements Pane {
 
 class SplitPane implements Pane {
   axis: 'horizontal' | 'vertical' = 'horizontal'
-  anchor: number = 0.5
+  ratio: number = 0.5
 
   first: Pane | null = null
   second: Pane | null = null
@@ -157,23 +159,23 @@ class SplitPane implements Pane {
     }
 
     if(this.first !== null) {
-      let subregion = split(drawer.getLocalRegion(), 0.0, this.anchor)
+      let subregion = split(drawer.getLocalRegion(), 0.0, this.ratio)
       const firstDrawer = drawer.subregion(subregion)
       this.first.draw(firstDrawer)
     }
     if(this.second !== null) {
-      let subregion = split(drawer.getLocalRegion(), this.anchor, 1.0)
+      let subregion = split(drawer.getLocalRegion(), this.ratio, 1.0)
       const secondDrawer = drawer.subregion(subregion)
       this.second.draw(secondDrawer)
     }
 
     switch(this.axis) {
       case 'horizontal':
-        const y = Math.round(drawer.getLocalRegion().height * this.anchor)
+        const y = Math.round(drawer.getLocalRegion().height * this.ratio)
         drawer.drawLine(0, y, drawer.getLocalRegion().width, y, { stroke: 'black' })
         break
       case 'vertical':
-        const x = Math.round(drawer.getLocalRegion().width * this.anchor)
+        const x = Math.round(drawer.getLocalRegion().width * this.ratio)
         drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
         break
     }
