@@ -13,7 +13,7 @@ export class Algonim extends HTMLElement {
 
   static modelConstructors: { [key: string]: () => Model } = {
     code: () => new Models.Code(),
-    tree: () => new Models.Tree()
+    tree: () => new Models.Graph()
   }
 
 

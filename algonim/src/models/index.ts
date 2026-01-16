@@ -1,2 +1,2 @@
-export * from './Code'
-export * from './Tree'
+export { Code } from './Code'
+export { Graph } from './Graph'
