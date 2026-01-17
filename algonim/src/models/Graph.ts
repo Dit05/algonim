@@ -207,7 +207,7 @@ export class Graph extends Model {
 
 
   public draw(drawer: Drawer): void {
-    throw new Error('Method not implemented.')
+    // TODO
   }
 
 }

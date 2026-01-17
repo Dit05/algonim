@@ -1,5 +1,5 @@
 import { Region } from './Region'
-import { DrawStyle, LineStyle, FontStyle, TextAlign } from './Styles'
+import { DrawStyle, LineStyle, ArrowStyle, FontStyle, TextAlign } from './Styles'
 
 
 export class Drawer {
@@ -13,6 +13,16 @@ export class Drawer {
     miterLimit: 10,
     lineDash: [],
     lineDashOffset: 0
+  }
+
+  static readonly defaultArrowStyle: ArrowStyle = {
+    /**
+    * "Shallowness" of the arrow.
+    * 0°: prongs point back towards the start point
+    * 90°: prongs point perpendicularly outwards
+    */
+    angleDegrees: 45,
+    length: 10
   }
 
   static readonly defaultFontStyle: FontStyle = {
@@ -116,6 +126,32 @@ export class Drawer {
 
       this.context.stroke()
     })
+  }
+
+  public drawArrow(startX: number, startY: number, endX: number, endY: number, lineStyle: Partial<LineStyle>, arrowStyle: Partial<ArrowStyle>) {
+    const effectiveArrowStyle: ArrowStyle = { ...Drawer.defaultArrowStyle, ...arrowStyle }
+    this.drawLine(startX, startY, endX, endY, lineStyle)
+
+    const radians = effectiveArrowStyle.angleDegrees / 180.0 * Math.PI
+    const sin = Math.sin(radians)
+    const cos = Math.cos(radians)
+
+    // i: perpendicular to the end of the arrow
+    // j: backwards
+    let dx = endX - startX
+    let dy = endY - startY
+    if(Math.abs(dx) < 0.00001 && Math.abs(dy) < 0.00001) return
+
+    const len = Math.sqrt(dx*dx + dy*dy)
+    dx /= len
+    dy /= len
+
+    const scale = effectiveArrowStyle.length
+    const i = { x: -dy * scale, y: +dx * scale }
+    const j = { x: -dx * scale, y: -dy * scale }
+
+    this.drawLine(endX, endY, endX + sin * i.x + cos * j.x, endY + sin * i.y + cos * j.y, lineStyle)
+    this.drawLine(endX, endY, endX - sin * i.x + cos * j.x, endY - sin * i.y + cos * j.y, lineStyle)
   }
 
   public drawText(text: string, x: number, y: number, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {

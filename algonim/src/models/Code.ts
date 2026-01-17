@@ -44,34 +44,50 @@ export class Code extends Model {
     return sign
   }
 
-  // TODO way of figuring out line spacing
   // TODO customizability
   public draw(drawer: Drawer) {
     const align: TextAlign = { align: 'start', baseline: 'top' }
     const style: Partial<FontStyle> = { fill: 'black' }
 
-    // TODO handle leading whitespace
-    let lineCount = 0
+    // TODO line wrap
+    let y = 12
+    const spacingFactor = 0.8
+    const gutterWidth = 24
     for(let lineCount = 0; lineCount < this.lines.length; lineCount++) {
       const line = this.lines[lineCount]
-      const metrics = drawer.measureText(line.text, align, style)
 
-      // TODO line spacing
-      const y = (24 + 2) * lineCount
-      let x = 10
-      drawer.drawText(line.text, x, y, align, style)
+      let indent = 0
+      for(let i = 0; i < line.text.length; i++) {
+        let done = false
+        switch(line.text[i]) {
+          case ' ': indent += 1; break
+          case '\t': indent += 2; break
+          default: done = true; break
+        }
+        if(done) break
+      }
+      const indentSize = indent * drawer.measureText('m', align, style).width
+
+      const text = line.text.trim()
+
+      const metrics = drawer.measureText(text, align, style)
+      const height = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent
+      const heightAdvance = height * spacingFactor
+
+      let x = gutterWidth + indentSize
+      drawer.drawText(text, x, y, align, style)
       x += metrics.width
       for(let sign of line.signs) {
         x += 10
         drawer.drawText(sign.text, x, y, align, { ...style, ...{ fill: 'blue' } })
         x += drawer.measureText(sign.text, align, { ...style, ...{ fill: 'blue' } }).width
       }
-    }
 
-    // TODO arrow
-    if(this.arrowLine !== null) {
-      let y = (24 + 2) * this.arrowLine + 12;
-      drawer.drawLine(0, y, 10, y, { stroke: 'red' })
+      if(lineCount == this.arrowLine) {
+        drawer.drawArrow(gutterWidth + indentSize - 12, y + heightAdvance / 2, gutterWidth + indentSize - 2, y + heightAdvance / 2, { stroke: 'red' }, { length: 4 })
+      }
+
+      y += heightAdvance
     }
   }
 

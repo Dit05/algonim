@@ -12,6 +12,11 @@ export type LineStyle = {
   lineDashOffset: number
 }
 
+export type ArrowStyle = {
+  angleDegrees: number,
+  length: number
+}
+
 export type FontStyle = {
   fill: DrawStyle | null,
   line: LineStyle | null,
