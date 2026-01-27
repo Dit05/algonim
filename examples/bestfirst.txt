@@ -1,0 +1,28 @@
+Best-first keresés (k,V)
+
+Startcsúcs := k
+Sz(Startcsúcs) := nincs
+Nyílt := {Startcsúcs}
+H(C) := heurisztika(D)
+Zárt := {}
+
+while Nyílt nem üres
+	Legyen C eleme Nyílt uh. H(C) = Min{H(D) | D eleme Nyílt}
+
+	if C eleme V return C
+
+	for C minden D gyermekére do
+		if D nem eleme Nyílt és nem leme Zárt then
+
+			H(D) := heurisztika(D)
+			Sz(D) := C
+			Nyílt := Nyílt ⋃ {D}
+
+		fi
+	od
+
+	Nyílt := Nyílt ∖ {C}
+	Zárt := Zárt ⋃ {C}
+
+od
+return "Nincs megoldás"

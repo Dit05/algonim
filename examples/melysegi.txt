@@ -1,0 +1,28 @@
+Mélységi keresés (k, V)
+
+Startcsúcs := k
+M (Startcsúcs) := 0
+Sz (Startcsúcs) := nincs
+Nyílt := {Startcsúcs}
+Zárt := {}
+
+While Nyílt nem üres do
+	Legyen C eleme Nyílt uh. M(C) = Max{M(D) | D eleme Nyílt}
+
+	if C eleme V then return C
+
+	for C minden D gyermekére do
+		if D nem eleme Nyílt és D nem eleme Zárt then
+
+			M(D) := M(C) + 1
+			Sz(D) := C
+			Nyílt := Nyílt ⋃ {D}
+
+		fi
+	od
+
+	Nyílt := Nyílt ∖ {C}
+	Zárt := Zárt ⋃ {C}
+
+od
+return "Nincs megoldás"

@@ -1,0 +1,42 @@
+A-algoritmus (k, V)
+
+Startcsúcs := k
+G(Startcsúcs) := 0
+F(Startcsúcs) := G(Startcsúcs) + H(Startcsúcs)
+Sz(Startcsúcs) := nincs
+Nyílt := {Startcsúcs}
+Zárt := {∅}
+
+While Nyílt nem üres do
+	Legyen C eleme Nyílt uh. F(C) = Min{F(D) | D eleme Nyílt}
+
+	if C eleme V then return C
+
+	for C minden D gyermekére do
+		if D nem eleme Nyílt és D nem eleme Zárt then
+			G(D) := G(C) + R(o)
+			F(D) := G(D) + H(D)
+			Sz(D) := C
+			Nyílt := Nyílt ⋃ {D}
+		fi
+
+		if D eleme Nyílt és G(D) > G(C) + R(o) then
+			G(D) := G(C) + R(o)
+			Sz(D) := C
+			F(D) := G(D) + H(D)
+		fi
+
+		if D eleme Zárt és G(D) > G(C) + R(o) then
+			G(D) := G(C) + R(o)
+			Sz(D) := C
+			F(D) := G(D) + H(D)
+			Zárt := Zárt ∖ {D}
+			Nyílt := Nyílt ⋃ {D}
+		fi
+	od
+
+	Nyílt := Nyílt ∖ {C}
+	Zárt := Zárt ⋃ {C}
+
+od
+return "Nincs megoldás"
