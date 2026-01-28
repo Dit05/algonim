@@ -1,6 +1,7 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
 import { TextAlign, FontStyle } from '@/gfx/Styles'
+import * as CONFIG from '@/config'
 
 
 class Line {
@@ -17,9 +18,15 @@ export class Sign {
   }
 
   public destroy() {
-    if(this.line === null) throw new TypeError("This sign has been destroyed.")
+    if(this.line === null) throw new TypeError('This sign has been destroyed.')
 
-    // TODO remove
+    const index = this.line.signs.indexOf(this)
+    if(index === -1) {
+      if(CONFIG.CONSISTENCY_CHECKS) CONFIG.warnInconsistency('Non-destroyed Sign not in signs array of Line')
+      return
+    }
+
+    this.line.signs.splice(index, 1)
   }
 }
 

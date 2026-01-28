@@ -34,10 +34,17 @@
         const outputLines = [ 'Output: (totally not a CodeModel)' ]
         fakeConsole.setLines(outputLines)
 
+        const graph = alg.createModel('graph')
+        let node = graph.createNode()
+        graph.root = node
+        node.position.x = 48
+        node.position.y = 48
+        node.value = 149
+
         let layout = {
           'split': 'vertical',
           'ratio': 0.4,
-          'left': alg.createModel('graph'),
+          'left': graph,
           'right': {
             'split': 'horizontal',
             'top': code,
@@ -76,6 +83,7 @@
         code.arrowLine = null
         await alg.keyframe()
 
+        iSign.destroy()
         code.createSign(4).text = 'Fin.'
         await alg.keyframe()
       })

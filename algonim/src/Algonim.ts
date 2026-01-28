@@ -1,3 +1,4 @@
+import { Point, Size } from '@/gfx/Primitives'
 import { Region } from '@/gfx/Region'
 import { Drawer } from '@/gfx/Drawer'
 import { Model } from '@/models/Model'
@@ -53,10 +54,12 @@ export class Algonim extends HTMLElement {
     console.log('Redraw called')
 
     const CONTEXT_ID = '2d'
+
+    // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
     const ctx = this.canvas.getContext(CONTEXT_ID)
     if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
 
-    const drawer = new Drawer(ctx, new Region(0, 0, this.canvas.width, this.canvas.height))
+    const drawer = new Drawer(ctx, new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height)))
     drawer.fill("white");
 
     if(this.rootPane !== null) {
@@ -169,14 +172,15 @@ class SplitPane implements Pane {
       this.second.draw(secondDrawer)
     }
 
+    // +0.5 seems to fix the line ending up between pixels.
     switch(this.axis) {
       case 'horizontal':
-        const y = Math.round(drawer.getLocalRegion().height * this.ratio)
-        drawer.drawLine(0, y, drawer.getLocalRegion().width, y, { stroke: 'black' })
+        const y = Math.round(drawer.getLocalRegion().size.height * this.ratio) + 0.5
+        drawer.drawLine(0, y, drawer.getLocalRegion().size.width, y, { stroke: 'black' })
         break
       case 'vertical':
-        const x = Math.round(drawer.getLocalRegion().width * this.ratio)
-        drawer.drawLine(x, 0, x, drawer.getLocalRegion().height, { stroke: 'black' })
+        const x = Math.round(drawer.getLocalRegion().size.width * this.ratio) + 0.5
+        drawer.drawLine(x, 0, x, drawer.getLocalRegion().size.height, { stroke: 'black' })
         break
     }
   }

@@ -1,6 +1,14 @@
+import { Point, Size } from './Primitives'
 import { Region } from './Region'
 import { DrawStyle, LineStyle, ArrowStyle, FontStyle, TextAlign } from './Styles'
 
+
+export type EllipseExtras = {
+  rotation: number,
+  startAngle: number,
+  endAngle: number,
+  counterclockwise: boolean
+}
 
 export class Drawer {
 
@@ -44,11 +52,13 @@ export class Drawer {
 
   readonly context: CanvasRenderingContext2D
   readonly region: Region
+  readonly origin: Point
 
 
-  constructor(context: CanvasRenderingContext2D, region: Region) {
+  constructor(context: CanvasRenderingContext2D, region: Region, origin: Point = Point(0, 0)) {
     this.context = context
     this.region = region
+    this.origin = origin
   }
 
 
@@ -56,17 +66,22 @@ export class Drawer {
     return new Drawer(this.context, this.region.subregion(region))
   }
 
+  public withTranslatedOrigin(origin: Point): Drawer {
+    return new Drawer(this.context, this.region, Point(this.origin.x + origin.x, this.origin.y + origin.y))
+  }
+
   public getLocalRegion(): Region {
-    return new Region(0, 0, this.region.width, this.region.height)
+    return new Region(Point(0, 0), this.region.size)
   }
 
 
-  doClipped(fn: () => void) {
+  doClipped(fn: () => void, skipOrigin: boolean = false) {
     this.context.save()
-    this.context.translate(this.region.x, this.region.y)
+    this.context.translate(this.region.origin.x, this.region.origin.y)
     this.context.beginPath()
-    this.context.rect(0, 0, this.region.width, this.region.height)
+    this.context.rect(0, 0, this.region.size.width, this.region.size.height)
     this.context.clip()
+    if(!skipOrigin) this.context.translate(this.origin.x, this.origin.y)
     fn()
     this.context.restore()
   }
@@ -80,6 +95,10 @@ export class Drawer {
     this.context.miterLimit = effectiveStyle.miterLimit
     this.context.setLineDash(effectiveStyle.lineDash)
     this.context.lineDashOffset = effectiveStyle.lineDashOffset
+  }
+
+  applyFillStyle(style: DrawStyle) {
+    this.context.fillStyle = style
   }
 
   applyTextAlign(align: Partial<TextAlign>) {
@@ -105,11 +124,11 @@ export class Drawer {
     }
   }
 
-  public drawLine(startX: number, startY: number, endX: number, endY: number, style: Partial<LineStyle>) {
+  public drawLine(startX: number, startY: number, endX: number, endY: number, style: Partial<LineStyle> = {}) {
     this.drawMultiLine([{x: startX, y: startY}, {x: endX, y: endY}], style)
   }
 
-  public drawMultiLine(points: Iterable<{x: number, y: number}>, style: Partial<LineStyle>) {
+  public drawMultiLine(points: Iterable<Point>, style: Partial<LineStyle>) {
     this.doClipped(() => {
       this.context.beginPath()
       this.applyLineStyle(style)
@@ -128,7 +147,8 @@ export class Drawer {
     })
   }
 
-  public drawArrow(startX: number, startY: number, endX: number, endY: number, lineStyle: Partial<LineStyle>, arrowStyle: Partial<ArrowStyle>) {
+
+  public drawArrow(startX: number, startY: number, endX: number, endY: number, lineStyle: Partial<LineStyle> = {}, arrowStyle: Partial<ArrowStyle> = {}) {
     const effectiveArrowStyle: ArrowStyle = { ...Drawer.defaultArrowStyle, ...arrowStyle }
     this.drawLine(startX, startY, endX, endY, lineStyle)
 
@@ -153,6 +173,37 @@ export class Drawer {
     this.drawLine(endX, endY, endX + sin * i.x + cos * j.x, endY + sin * i.y + cos * j.y, lineStyle)
     this.drawLine(endX, endY, endX - sin * i.x + cos * j.x, endY - sin * i.y + cos * j.y, lineStyle)
   }
+
+
+  public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
+    this.doClipped(() => {
+
+      const effectiveExtras: EllipseExtras = { ...{
+          rotation: 0,
+          startAngle: 0,
+          endAngle: Math.PI * 2,
+          counterclockwise: false
+        }, ...extras }
+
+      const ellipse = function(ctx: CanvasRenderingContext2D) {
+        ctx.ellipse(center.x, center.y, size.width / 2, size.height / 2, effectiveExtras.rotation, effectiveExtras.startAngle, effectiveExtras.endAngle, effectiveExtras.counterclockwise)
+      }
+
+      if(fillStyle != null) {
+        this.applyFillStyle(fillStyle)
+        this.context.beginPath()
+        ellipse(this.context)
+        this.context.fill()
+      }
+      if(lineStyle != null) {
+        this.applyLineStyle(lineStyle)
+        this.context.beginPath()
+        ellipse(this.context)
+        this.context.stroke()
+      }
+    })
+  }
+
 
   public drawText(text: string, x: number, y: number, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
     // TODO account for non-individually customizable stuff like textRendering
@@ -187,10 +238,22 @@ export class Drawer {
     return measured
   }
 
+
   public fill(fillStyle: DrawStyle) {
     this.doClipped(() => {
       this.context.fillStyle = fillStyle;
-      this.context.fillRect(0, 0, this.region.width, this.region.height)
+      this.context.fillRect(0, 0, this.region.size.width, this.region.size.height)
+    }, true) // Skip the origin offset for this
+  }
+
+  /**
+  * Escape hatch that gives you direct access to the CanvasRenderingContext2D.
+  *
+  * SAFETY: The drawing state stack MUST NOT be different after your closure returns! This is to prevent future drawing operations from being affected.
+  */
+  public drawFreeform(fn: (ctx: CanvasRenderingContext2D) => void) {
+    this.doClipped(() => {
+      fn(this.context)
     })
   }
 

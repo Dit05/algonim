@@ -1,10 +1,14 @@
 import { Model } from './Model'
+import { DebugDraw } from '@/gfx/DebugDraw'
 import { Drawer } from '@/gfx/Drawer'
-import { Point } from '@/gfx/Point'
+import { Point, Size, SizeUtil, Vector, VectorUtil } from '@/gfx/Primitives'
+import { TextAlign } from '@/gfx/Styles'
+import { Border, EllipseBorder } from '@/gfx/Border'
+import { Region } from '@/gfx/Region'
 import * as CONFIG from '@/config'
 
 
-class Edge {
+export class Edge {
   bidirectional: boolean
   source: Node
   destination: Node
@@ -59,7 +63,16 @@ class Edge {
 
   checkInvariants() {
     if(!CONFIG.CONSISTENCY_CHECKS) return
-    // TODO
+
+    if(this.source.outgoing.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in outgoing array of source')
+    if(this.destination.incoming.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in incoming array of destination')
+    if(this.bidirectional) {
+      if(this.source.incoming.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in incoming array of source')
+      if(this.destination.outgoing.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in outgoing array of destination')
+    } else {
+      if(this.source.incoming.indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in incoming array of source')
+      if(this.destination.outgoing.indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in outgoing array of destination')
+    }
   }
 
 
@@ -131,83 +144,77 @@ export class Node {
   outgoing: Edge[] = []
 
   position: Point = Point(0, 0)
-  parent: Graph | Node | null
-  children: (Node | null)[] = []
   public value: any = null
 
 
-  constructor(parent: Graph | Node) {
-    this.parent = parent
-  }
+  public discoverLinkedNodes(): Node[] {
+    // TODO better
+    // potential idea: use only 1 array
+    const visited: Node[] = []
+    const toVisit: Node[] = [ this ]
 
+    let current = toVisit.pop()
+    while(current !== undefined) {
+      visited.push(current)
 
-  public isValid(): boolean {
-    return this.parent !== null
-  }
-
-  assertValid(): void {
-    if(!this.isValid()) {
-      throw new TypeError("This tree node has become invalid.")
-    }
-  }
-
-
-  public getChild(index: number): Node | null {
-    this.assertValid()
-    return this.children[index]
-  }
-
-  public removeSlot(index: number): void {
-    this.assertValid()
-    this.children.splice(index, 1)
-  }
-
-
-  invalidateRecursive(): void {
-    this.parent = null
-    for(let child of this.children) {
-      child?.invalidateRecursive()
-    }
-  }
-
-  public delete(keepSlot: boolean = false): void {
-    if(!this.isValid()) return
-
-    if(this.parent instanceof Graph) {
-      this.parent.root = null
-    } else if(this.parent instanceof Node) {
-      let removed = false
-      for(let i = 0; i < this.parent.children.length; i++) {
-        if(this.parent.children[i] === this) {
-          this.parent.children[i] = null
-          if(!keepSlot) this.parent.removeSlot(i)
-          removed = true
-          break
+      for(let edge of current.incoming) {
+        if(visited.indexOf(edge.source) === -1) {
+          toVisit.push(edge.source)
         }
       }
-      if(!removed) throw new TypeError("Tree node's parent is supposed to be a tree node, but none of its children are this instance.")
+      for(let edge of current.outgoing) {
+        if(visited.indexOf(edge.destination) === -1) {
+          toVisit.push(edge.destination)
+        }
+      }
+
+      current = toVisit.pop()
     }
-    this.invalidateRecursive()
+
+    return visited
   }
 
 }
 
 export class Graph extends Model {
 
-  root: Node | null = null
+  public root: Node | null = null
+  public defaultBorder: Border = new EllipseBorder()
 
 
-  public setRoot(value: any) {
-    if(this.root !== null) {
-      this.root.delete()
-    }
-    this.root = new Node(this)
-    this.root.value = value
+  public createNode(): Node {
+    return new Node()
   }
 
-
   public draw(drawer: Drawer): void {
-    // TODO
+    if(this.root === null) return
+
+    const nodes = this.root.discoverLinkedNodes()
+
+    for(let node of nodes) {
+      const str = String(node.value)
+      const align: TextAlign = { align: 'center', baseline: 'middle' }
+
+      const metrics = drawer.measureText(str, align)
+      const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
+
+      drawer.drawText(str, node.position.x, node.position.y, align)
+
+      const borderBounds: Region = this.defaultBorder.getBounds(textSize)
+
+      //DebugDraw.box(drawer, node.position, textSize)
+
+      // FIXME misalignment when boundary goes off-screen
+      const corner = VectorUtil.add(node.position, borderBounds.origin)
+      const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
+        .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
+      //borderDrawer.fill('#0000ff44')
+      this.defaultBorder.draw(borderDrawer)
+
+      //DebugDraw.point(borderDrawer, 0, 0, 'red')
+
+      // TODO per-node border
+    }
   }
 
 }
