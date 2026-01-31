@@ -1,5 +1,4 @@
 import { Model } from './Model'
-import { DebugDraw } from '@/gfx/DebugDraw'
 import { Drawer } from '@/gfx/Drawer'
 import { Point, Size, SizeUtil, Vector, VectorUtil } from '@/gfx/Primitives'
 import { TextAlign } from '@/gfx/Styles'
@@ -9,20 +8,20 @@ import * as CONFIG from '@/config'
 
 
 export class Edge {
-  bidirectional: boolean
+  bidirectional: boolean // TODO 2 arrows
   source: Node
   destination: Node
 
 
   public constructor(source: Node, destination: Node, bidirectional: boolean) {
     // TODO fail without breaking invariants
-    this.link(source, 'outgoing')
-    this.link(destination, 'incoming')
-    this.setBidirectional(bidirectional)
-
     this.source = source
     this.destination = destination
     this.bidirectional = bidirectional
+
+    this.link(source, 'outgoing')
+    this.link(destination, 'incoming')
+    this.setBidirectional(bidirectional)
   }
 
 
@@ -143,9 +142,15 @@ export class Node {
   incoming: Edge[] = []
   outgoing: Edge[] = []
 
-  position: Point = Point(0, 0)
+  public position: Point = Point(0, 0)
   public value: any = null
 
+  public border: Border | null = null
+
+
+  public connect(other: Node, bidirectional: boolean = false): Edge {
+    return new Edge(this, other, bidirectional)
+  }
 
   public discoverLinkedNodes(): Node[] {
     // TODO better
@@ -190,6 +195,7 @@ export class Graph extends Model {
     if(this.root === null) return
 
     const nodes = this.root.discoverLinkedNodes()
+    const sizes = new WeakMap()
 
     for(let node of nodes) {
       const str = String(node.value)
@@ -197,10 +203,12 @@ export class Graph extends Model {
 
       const metrics = drawer.measureText(str, align)
       const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
+      sizes.set(node, textSize)
 
       drawer.drawText(str, node.position.x, node.position.y, align)
 
-      const borderBounds: Region = this.defaultBorder.getBounds(textSize)
+      const border = node.border || this.defaultBorder
+      const borderBounds: Region = border.getBounds(textSize)
 
       //DebugDraw.box(drawer, node.position, textSize)
 
@@ -209,11 +217,25 @@ export class Graph extends Model {
       const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
         .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
       //borderDrawer.fill('#0000ff44')
-      this.defaultBorder.draw(borderDrawer)
+      border.draw(borderDrawer)
+    }
 
-      //DebugDraw.point(borderDrawer, 0, 0, 'red')
+    // Draw edges
+    for(let node of nodes) {
+      for(let edge of node.outgoing) {
+        const other = edge.getDestination()
 
-      // TODO per-node border
+        let startPos = edge.getSource().position
+        let endPos = edge.getDestination().position
+
+        const startAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
+        startPos = VectorUtil.add(startPos, this.defaultBorder.getBoundaryPoint(sizes.get(node), startAngle))
+
+        const endAngle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x)
+        endPos = VectorUtil.add(endPos, this.defaultBorder.getBoundaryPoint(sizes.get(other), endAngle))
+
+        drawer.drawArrow(startPos.x, startPos.y, endPos.x, endPos.y)
+      }
     }
   }
 

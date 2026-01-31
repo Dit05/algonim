@@ -1,4 +1,5 @@
 import { Region } from './Region'
+import { DrawStyle, LineStyle } from './Styles';
 import { Point, Size, SizeUtil } from './Primitives';
 import { Drawer } from './Drawer';
 
@@ -22,7 +23,14 @@ export abstract class Border {
 
 }
 
-export class EllipseBorder extends Border {
+export abstract class LineAndFillBorder extends Border {
+
+  public line: Partial<LineStyle> | null = {}
+  public fill: DrawStyle | null = null
+
+}
+
+export class EllipseBorder extends LineAndFillBorder {
 
   static readonly MARGIN: number = 2 // Margin added to the bounds to prevent antialiasing from becoming clipped away (more noticeable than you think!).
 
@@ -51,7 +59,7 @@ export class EllipseBorder extends Border {
   }
 
   public draw(drawer: Drawer): void {
-    drawer.drawEllipse(Point(0, 0), SizeUtil.shrink(drawer.getLocalRegion().size, EllipseBorder.MARGIN * 2))
+    drawer.drawEllipse(Point(0, 0), SizeUtil.shrink(drawer.getLocalRegion().size, EllipseBorder.MARGIN * 2), this.line, this.fill)
   }
 
 }

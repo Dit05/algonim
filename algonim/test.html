@@ -41,6 +41,11 @@
         node.position.y = 48
         node.value = 149
 
+        let node2 = graph.createNode()
+        node2.connect(node)
+        node2.position.x = 128
+        node2.position.y = 192
+
         let layout = {
           'split': 'vertical',
           'ratio': 0.4,
