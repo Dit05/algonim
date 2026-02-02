@@ -176,11 +176,11 @@ class SplitPane implements Pane {
     switch(this.axis) {
       case 'horizontal':
         const y = Math.round(drawer.getLocalRegion().size.height * this.ratio) + 0.5
-        drawer.drawLine(0, y, drawer.getLocalRegion().size.width, y, { stroke: 'black' })
+        drawer.drawLine(Point(0, y), Point(drawer.getLocalRegion().size.width, y), { stroke: 'black' })
         break
       case 'vertical':
         const x = Math.round(drawer.getLocalRegion().size.width * this.ratio) + 0.5
-        drawer.drawLine(x, 0, x, drawer.getLocalRegion().size.height, { stroke: 'black' })
+        drawer.drawLine(Point(x, 0), Point(x, drawer.getLocalRegion().size.height), { stroke: 'black' })
         break
     }
   }

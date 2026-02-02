@@ -1,5 +1,6 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
+import { Point } from '@/gfx/Primitives'
 import { TextAlign, FontStyle } from '@/gfx/Styles'
 import * as CONFIG from '@/config'
 
@@ -82,16 +83,19 @@ export class Code extends Model {
       const heightAdvance = height * spacingFactor
 
       let x = gutterWidth + indentSize
-      drawer.drawText(text, x, y, align, style)
+      drawer.drawText(text, Point(x, y), align, style)
       x += metrics.width
       for(let sign of line.signs) {
         x += 10
-        drawer.drawText(sign.text, x, y, align, { ...style, ...{ fill: 'blue' } })
+        drawer.drawText(sign.text, Point(x, y), align, { ...style, ...{ fill: 'blue' } })
         x += drawer.measureText(sign.text, align, { ...style, ...{ fill: 'blue' } }).width
       }
 
       if(lineCount == this.arrowLine) {
-        drawer.drawArrow(gutterWidth + indentSize - 12, y + heightAdvance / 2, gutterWidth + indentSize - 2, y + heightAdvance / 2, { stroke: 'red' }, { length: 4 })
+        const start = Point(gutterWidth + indentSize - 12, y + heightAdvance / 2)
+        const end = Point(gutterWidth + indentSize - 2, y + heightAdvance / 2)
+        drawer.drawLine(start, end, { stroke: 'red' })
+        drawer.drawArrowhead(start, end, { stroke: 'red' }, { length: 4 })
       }
 
       y += heightAdvance

@@ -124,8 +124,8 @@ export class Drawer {
     }
   }
 
-  public drawLine(startX: number, startY: number, endX: number, endY: number, style: Partial<LineStyle> = {}) {
-    this.drawMultiLine([{x: startX, y: startY}, {x: endX, y: endY}], style)
+  public drawLine(start: Point, end: Point, style: Partial<LineStyle> = {}) {
+    this.drawMultiLine([start, end], style)
   }
 
   public drawMultiLine(points: Iterable<Point>, style: Partial<LineStyle>) {
@@ -148,9 +148,8 @@ export class Drawer {
   }
 
 
-  public drawArrow(startX: number, startY: number, endX: number, endY: number, lineStyle: Partial<LineStyle> = {}, arrowStyle: Partial<ArrowStyle> = {}) {
+  public drawArrowhead(start: Point, end: Point, lineStyle: Partial<LineStyle> = {}, arrowStyle: Partial<ArrowStyle> = {}) {
     const effectiveArrowStyle: ArrowStyle = { ...Drawer.defaultArrowStyle, ...arrowStyle }
-    this.drawLine(startX, startY, endX, endY, lineStyle)
 
     const radians = effectiveArrowStyle.angleDegrees / 180.0 * Math.PI
     const sin = Math.sin(radians)
@@ -158,8 +157,8 @@ export class Drawer {
 
     // i: perpendicular to the end of the arrow
     // j: backwards
-    let dx = endX - startX
-    let dy = endY - startY
+    let dx = end.x - start.x
+    let dy = end.y - start.y
     if(Math.abs(dx) < 0.00001 && Math.abs(dy) < 0.00001) return
 
     const len = Math.sqrt(dx*dx + dy*dy)
@@ -170,8 +169,8 @@ export class Drawer {
     const i = { x: -dy * scale, y: +dx * scale }
     const j = { x: -dx * scale, y: -dy * scale }
 
-    this.drawLine(endX, endY, endX + sin * i.x + cos * j.x, endY + sin * i.y + cos * j.y, lineStyle)
-    this.drawLine(endX, endY, endX - sin * i.x + cos * j.x, endY - sin * i.y + cos * j.y, lineStyle)
+    this.drawLine(end, Point(end.x + sin * i.x + cos * j.x, end.y + sin * i.y + cos * j.y), lineStyle)
+    this.drawLine(end, Point(end.x - sin * i.x + cos * j.x, end.y - sin * i.y + cos * j.y), lineStyle)
   }
 
 
@@ -205,7 +204,7 @@ export class Drawer {
   }
 
 
-  public drawText(text: string, x: number, y: number, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
+  public drawText(text: string, position: Point, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
     // TODO account for non-individually customizable stuff like textRendering
     const effectiveStyle: FontStyle = { ...Drawer.defaultFontStyle, ...style }
 
@@ -214,10 +213,10 @@ export class Drawer {
       this.applyTextAlign(align)
 
       if(effectiveStyle.fill !== null) {
-        this.context.fillText(text, x, y)
+        this.context.fillText(text, position.x, position.y)
       }
       if(effectiveStyle.line !== null) {
-        this.context.strokeText(text, x, y)
+        this.context.strokeText(text, position.x, position.y)
       }
     })
   }

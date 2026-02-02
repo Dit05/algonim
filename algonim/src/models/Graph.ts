@@ -205,7 +205,7 @@ export class Graph extends Model {
       const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
       sizes.set(node, textSize)
 
-      drawer.drawText(str, node.position.x, node.position.y, align)
+      drawer.drawText(str, node.position, align)
 
       const border = node.border || this.defaultBorder
       const borderBounds: Region = border.getBounds(textSize)
@@ -234,7 +234,9 @@ export class Graph extends Model {
         const endAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
         endPos = VectorUtil.add(endPos, this.defaultBorder.getBoundaryPoint(sizes.get(other), endAngle))
 
-        drawer.drawArrow(startPos.x, startPos.y, endPos.x, endPos.y)
+        drawer.drawLine(startPos, endPos)
+        drawer.drawArrowhead(startPos, endPos)
+        if(edge.getBidirectional()) drawer.drawArrowhead(endPos, startPos)
       }
     }
   }
