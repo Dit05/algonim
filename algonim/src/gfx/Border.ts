@@ -19,7 +19,7 @@ export abstract class Border {
   /**
   * Draws the border within the previously calculated bounding box.
   */
-  public abstract draw(drawer: Drawer): void
+  public abstract draw(contentSize: Size, drawer: Drawer): void
 
 }
 
@@ -42,14 +42,14 @@ export class EllipseBorder extends LineAndFillBorder {
     // Nice!
 
     // Now all we need to do is scale the points.
-    return Size(-Math.SQRT2 * contentSize.width / 2, -Math.SQRT2 * contentSize.height / 2)
+    return Size(Math.SQRT2 * contentSize.width / 2, Math.SQRT2 * contentSize.height / 2)
   }
 
   public getBounds(contentSize: Size): Region {
     const semiAxes = this.getSemiAxes(contentSize)
 
-    const start = Point(semiAxes.width - EllipseBorder.MARGIN, semiAxes.height - EllipseBorder.MARGIN)
-    const end = Point(-semiAxes.width + EllipseBorder.MARGIN, -semiAxes.height + EllipseBorder.MARGIN)
+    const start = Point(-semiAxes.width - EllipseBorder.MARGIN, -semiAxes.height - EllipseBorder.MARGIN)
+    const end = Point(semiAxes.width + EllipseBorder.MARGIN, semiAxes.height + EllipseBorder.MARGIN)
     return Region.fromStartEnd(start, end)
   }
 
@@ -58,8 +58,8 @@ export class EllipseBorder extends LineAndFillBorder {
     return Point(semiAxes.width * Math.cos(angle), semiAxes.height * Math.sin(angle))
   }
 
-  public draw(drawer: Drawer): void {
-    drawer.drawEllipse(Point(0, 0), SizeUtil.shrink(drawer.getLocalRegion().size, EllipseBorder.MARGIN * 2), this.line, this.fill)
+  public draw(contentSize: Size, drawer: Drawer): void {
+    drawer.drawEllipse(Point(0, 0), SizeUtil.scale(this.getSemiAxes(contentSize), 2), this.line, this.fill)
   }
 
 }

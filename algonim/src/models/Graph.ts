@@ -217,7 +217,7 @@ export class Graph extends Model {
       const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
         .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
       //borderDrawer.fill('#0000ff44')
-      border.draw(borderDrawer)
+      border.draw(textSize, borderDrawer)
     }
 
     // Draw edges
@@ -228,10 +228,10 @@ export class Graph extends Model {
         let startPos = edge.getSource().position
         let endPos = edge.getDestination().position
 
-        const startAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
+        const startAngle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x)
         startPos = VectorUtil.add(startPos, this.defaultBorder.getBoundaryPoint(sizes.get(node), startAngle))
 
-        const endAngle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x)
+        const endAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
         endPos = VectorUtil.add(endPos, this.defaultBorder.getBoundaryPoint(sizes.get(other), endAngle))
 
         drawer.drawArrow(startPos.x, startPos.y, endPos.x, endPos.y)
