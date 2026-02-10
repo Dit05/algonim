@@ -7,7 +7,11 @@ import * as Models from '@/models'
 
 export class Algonim extends HTMLElement {
 
-  static observedAttributes = ["color", "shape"]
+  static observedAttributes = ["delay"]
+
+  // Observed attributes
+  delay: number = 1000
+  //
 
   canvas: HTMLCanvasElement
   rootPane: Pane | null = null
@@ -31,23 +35,28 @@ export class Algonim extends HTMLElement {
 
 
   connectedCallback() {
-    console.log("Custom element added to page.")
+    //console.log("Custom element added to page.")
   }
 
   disconnectedCallback() {
-    console.log("Custom element removed from page.")
+    //console.log("Custom element removed from page.")
   }
 
   connectedMoveCallback() {
-    console.log("Custom element moved with moveBefore()")
+    //console.log("Custom element moved with moveBefore()")
   }
 
   adoptedCallback() {
-    console.log("Custom element moved to new page.")
+    //console.log("Custom element moved to new page.")
   }
 
   attributeChangedCallback(name: any, oldValue: any, newValue: any) {
-    console.log(`Attribute ${name} has changed from ${oldValue} to ${newValue}.`)
+    //console.log(`Attribute ${name} has changed from ${oldValue} to ${newValue}.`)
+    switch(name) {
+      case 'delay':
+        this.delay = Number(newValue)
+        break
+    }
   }
 
   redraw() {
@@ -79,10 +88,12 @@ export class Algonim extends HTMLElement {
     return Promise.resolve()
   }
 
-  public async keyframe() {
+  public async keyframe(delayScale: number = 1) {
     this.redraw()
+
+    delayScale = Math.max(0, delayScale)
     return new Promise((resolve) => {
-      setTimeout(resolve, 1000)
+      setTimeout(resolve, this.delay * delayScale)
     })
   }
 
