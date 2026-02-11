@@ -2,6 +2,7 @@ import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
 import { Point, Size } from '@/gfx/Primitives'
 import { TextAlign, FontStyle } from '@/gfx/Styles'
+import { TextWrapper } from '@/gfx/TextWrapper'
 import * as CONFIG from '@/config'
 
 
@@ -66,87 +67,46 @@ export class Code extends Model {
     return indent
   }
 
-  static limitTextWidth(text: string, maxWidth: number, drawer: Drawer, align: TextAlign, style: Partial<FontStyle>, hyphen: string = '-'): string {
-    if(drawer.measureText(text, align, style).width <= maxWidth) {
-      // Happy path: the text just fits
-      return text
-    }
-
-    let min = 1
-    let max = text.length
-
-    while(min + 1 < max) {
-      const mid = Math.floor((min + max) / 2)
-      const width = drawer.measureText(text.substring(0, mid) + hyphen, align, style).width
-
-      if(width > maxWidth) {
-        max = mid
-      } else {
-        min = mid
-      }
-    }
-
-    return text.substring(0, min)
-  }
-
   // TODO customizability
   public draw(drawer: Drawer) {
     const align: TextAlign = { align: 'start', baseline: 'top' }
     const style: Partial<FontStyle> = { fill: 'black' }
 
+    const wrapper = new TextWrapper(drawer)
+
     const em: number = drawer.measureText('m', align, style).width
     const HYPHEN: string = '-'
 
     // TODO numbered lines
+    // TODO reintroduce signs as TextWrapper atoms
+
     let y = 12
     const spacingFactor = 0.8
     const gutterWidth = 24
 
-    let lineCount = 0
+    for(let i = 0; i < this.lines.length; i++) {
+      const line = this.lines[i]
+      const indentSize = Code.measureIndent(line.text) * em
 
-    let textLeft = ''
-    let line = this.lines[0]
-    let indentSize = 0
-    while(lineCount < this.lines.length || textLeft.length >= 0) {
-      if(textLeft.length <= 0) {
-        if(lineCount >= this.lines.length) {
-          break
-        }
-        line = this.lines[lineCount]
-        lineCount++
-        indentSize = Code.measureIndent(line.text) * em
-        textLeft = line.text.trim()
-        continue
-      }
+      const x = gutterWidth + indentSize
+      const wrapResult = wrapper.drawText([line.text], Point(x, y), drawer.getSize().width - x, align, style)
 
-      const metrics = drawer.measureText(textLeft, align, style)
-      const height = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent
-      const heightAdvance = height * spacingFactor
-
-      let x = gutterWidth + indentSize
-
-      let spaceLeft = drawer.getLocalRegion().size.width - x
-      let fitText = Code.limitTextWidth(textLeft, spaceLeft, drawer, align, style)
-
-      drawer.drawText(fitText.length < textLeft.length ? fitText + HYPHEN : fitText, Point(x, y), align, style)
-      x += metrics.width
-      // TODO line wrap this
+      /*
       for(let sign of line.signs) {
         x += 10
         drawer.drawText(sign.text, Point(x, y), align, { ...style, ...{ fill: 'blue' } })
         x += drawer.measureText(sign.text, align, { ...style, ...{ fill: 'blue' } }).width
       }
+      */
 
-      if(lineCount == this.arrowLine) {
-        const start = Point(gutterWidth + indentSize - 12, y + heightAdvance / 2)
-        const end = Point(gutterWidth + indentSize - 2, y + heightAdvance / 2)
+      if(i == this.arrowLine) {
+        const start = Point(gutterWidth + indentSize - 12, y + wrapResult.height / 2)
+        const end = Point(gutterWidth + indentSize - 2, y + wrapResult.height / 2)
         drawer.drawLine(start, end, { stroke: 'red' })
         drawer.drawArrowhead(start, end, { stroke: 'red' }, { length: 4 })
       }
 
-      y += heightAdvance
-
-      textLeft = textLeft.substring(fitText.length)
+      y += wrapResult.height
     }
   }
 

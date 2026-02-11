@@ -70,6 +70,10 @@ export class Drawer {
     return new Drawer(this.context, this.region, Point(this.origin.x + origin.x, this.origin.y + origin.y))
   }
 
+  public getSize(): Size {
+    return this.region.size
+  }
+
   public getLocalRegion(): Region {
     return new Region(Point(0, 0), this.region.size)
   }
