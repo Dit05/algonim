@@ -32,9 +32,7 @@ export class Algonim extends HTMLElement {
 
     // Create shadow canvas
     const shadow = this.attachShadow({ 'mode': 'closed' })
-    this.canvas = document.createElement('canvas')
-    this.canvas.width = 640
-    this.canvas.height = 480
+    this.canvas = this.createCanvas()
     shadow.appendChild(this.canvas)
   }
 
@@ -64,13 +62,21 @@ export class Algonim extends HTMLElement {
     }
   }
 
-  private redraw() {
-    console.log('Redraw called')
+  createCanvas(): HTMLCanvasElement {
+    const canvas = document.createElement('canvas')
+    // TODO customizable size
+    canvas.width = 640
+    canvas.height = 480
+    return canvas
+  }
+
+  redraw(canvas: HTMLCanvasElement | undefined = undefined /* Do NOT use `this` in parameter defaults, since it won't be bound yet */): Drawer {
+    if(canvas === undefined) canvas = this.canvas
 
     const CONTEXT_ID = '2d'
 
     // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
-    const ctx = this.canvas.getContext(CONTEXT_ID)
+    const ctx = canvas.getContext(CONTEXT_ID)
     if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
 
     const fullRegion = new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height))
@@ -80,14 +86,53 @@ export class Algonim extends HTMLElement {
     if(this.rootPane !== null) {
       this.rootPane.draw(drawer)
     }
+
+    return drawer
   }
 
-
   /** Animates a sequence on the element's canvas. The promise is resolved when the animation is over. */
-  public async slideshow(func: SequenceFn): Promise<void> {
-    await func(this)
+  public slideshow(func: (alg: Algonim) => Promise<void>): Promise<void> {
+    return func(this)
+  }
 
-    return Promise.resolve()
+  // FIXME why does this make the main animation finish instantly?
+  public recordGif(func: (alg: Algonim) => Promise<void>): Promise<void> {
+    const gifCanvas = this.createCanvas()
+
+    const handler: ProxyHandler<this> = {
+      // TODO type-safe proxying with advanced TS magic
+      get(target, prop, receiver): any {
+        if(prop === 'keyframe') {
+          // Modify the keyframe method
+          return function(this: Algonim, _bogusDelayScale: number = 1): Promise<void> {
+            // Redirect drawing to our GIF canvas
+            const drawer = this.redraw(gifCanvas)
+
+            // TODO insert into gif
+            const data = drawer.getImageData({ colorSpace: 'srgb' }).data
+            let hash = 0
+            for(let i = 0; i < data.length; i++) {
+              hash = (hash + 7*data[i]) % 149
+            }
+            console.log(`GIF FRAME (${hash})`)
+
+            return new Promise((resolve) => {
+              setTimeout(resolve, 0) // Genuis! 0 delay will just yield.
+            })
+          }
+        } else {
+          // Return the thing from the target object
+          let original = Reflect.get(target, prop, receiver)
+          if(typeof(original) === 'function') {
+            original = original.bind(target) // For some reason, this is needed to "maintain context" or something.
+          }
+          return original
+        }
+      }
+    }
+
+    const proxy = new Proxy(this, handler)
+    return func(proxy)
   }
 
   /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */

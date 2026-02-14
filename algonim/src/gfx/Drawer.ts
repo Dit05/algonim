@@ -317,6 +317,12 @@ export class Drawer {
     }, true) // Skip the origin offset for this
   }
 
+
+  /** [getImageData](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/getImageData), but only within the clipping region of this drawer. */
+  public getImageData(settings?: ImageDataSettings): ImageData {
+    return this.context.getImageData(this.clipRegion.origin.x, this.clipRegion.origin.y, this.clipRegion.size.width, this.clipRegion.size.height, settings)
+  }
+
   /**
   * Escape hatch that gives you direct access to the underlying [CanvasRenderingContext2D](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D).
   *
@@ -327,5 +333,8 @@ export class Drawer {
       fn(this.context)
     })
   }
+
+  /** Gets the underlying canvas rendering context. Prefer not using this, since it defeats the whole purpose of being able to draw with styles and clipping. Here be dragons! */
+  public getRawContext(): CanvasRenderingContext2D { return this.context }
 
 }
