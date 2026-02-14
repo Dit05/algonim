@@ -10,6 +10,7 @@
     <div style="margin: 0; padding: 0; width: 100%; height: 100vh;">
       <algonim-element delay=1000></algonim-element><br>
       <div>
+        <button onclick="algonim.recordGif(animationFunc)">Click to make a GIF!</button>
         <a href="./docs/index.html">docs</a>
       </div>
     </div>
@@ -23,7 +24,7 @@
     <script defer="defer">
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
-      algonim.slideshow(async (alg) => {
+      const animationFunc = async (alg) => {
         const code = alg.createModel('code')
         code.setLines([
           'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
@@ -102,10 +103,9 @@
         iSign.destroy()
         code.createSign(4).text = 'Fin.'
         await alg.keyframe()
-      })
+      }
 
-      //alg.setupExample()
-      //alg.redraw()
+      algonim.slideshow(animationFunc)
     </script>
   </body>
 </html>
