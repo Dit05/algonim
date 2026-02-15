@@ -2,6 +2,7 @@ import { Point, Size } from '@/gfx/Primitives'
 import { Region } from '@/gfx/Region'
 import { Drawer } from '@/gfx/Drawer'
 import { Model } from '@/models/Model'
+import { Gif } from '@/gif/Gif'
 import * as Models from '@/models'
 
 
@@ -98,6 +99,7 @@ export class Algonim extends HTMLElement {
   // FIXME why does this make the main animation finish instantly?
   public recordGif(func: (alg: Algonim) => Promise<void>): Promise<void> {
     const gifCanvas = this.createCanvas()
+    const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
     const handler: ProxyHandler<this> = {
       // TODO type-safe proxying with advanced TS magic
@@ -108,13 +110,13 @@ export class Algonim extends HTMLElement {
             // Redirect drawing to our GIF canvas
             const drawer = this.redraw(gifCanvas)
 
-            // TODO insert into gif
             const data = drawer.getImageData({ colorSpace: 'srgb' }).data
             let hash = 0
             for(let i = 0; i < data.length; i++) {
               hash = (hash + 7*data[i]) % 149
             }
             console.log(`GIF FRAME (${hash})`)
+            gif.addFrame(data)
 
             return new Promise((resolve) => {
               setTimeout(resolve, 0) // Genuis! 0 delay will just yield.
