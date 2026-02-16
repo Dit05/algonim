@@ -75,7 +75,6 @@ export class Code extends Model {
     const wrapper = new TextWrapper(drawer)
 
     const em: number = drawer.measureText('m', align, style).width
-    const HYPHEN: string = '-'
 
     // TODO numbered lines
     // TODO reintroduce signs as TextWrapper atoms
@@ -89,7 +88,7 @@ export class Code extends Model {
       const indentSize = Code.measureIndent(line.text) * em
 
       const x = gutterWidth + indentSize
-      const wrapResult = wrapper.drawText([line.text], Point(x, y), drawer.getSize().width - x, align, style)
+      const drawResult = wrapper.drawText([line.text], Point(x, y), drawer.getSize().width - x, align, style)
 
       /*
       for(let sign of line.signs) {
@@ -100,13 +99,13 @@ export class Code extends Model {
       */
 
       if(i == this.arrowLine) {
-        const start = Point(gutterWidth + indentSize - 12, y + wrapResult.height / 2)
-        const end = Point(gutterWidth + indentSize - 2, y + wrapResult.height / 2)
+        const start = Point(gutterWidth + indentSize - 12, y + drawResult.size.height / 2)
+        const end = Point(gutterWidth + indentSize - 2, y + drawResult.size.height / 2)
         drawer.drawLine(start, end, { stroke: 'red' })
         drawer.drawArrowhead(start, end, { stroke: 'red' }, { length: 4 })
       }
 
-      y += wrapResult.height
+      y += drawResult.size.height
     }
   }
 
