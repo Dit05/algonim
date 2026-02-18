@@ -2,15 +2,17 @@
 
 *My Thesis Project*
 
-## How to build
+## Building
 
 Go into the `algonim` directory and run the `build` script with `npm`: `npm run build`
 
-## How to use
+## Usage
 
-After building, you can simply open `test.html` in a web browser.
+To experience Algonim after you've built it locally, simply open `test.html` in a web browser.
 
-## Examples (TODO)
+New commits on `main` are also automatically built and deployed to the repository's [GitHub Page](https://dit05.github.io/algonim/).
+
+## To be recreated (TODO)
 
 - [Depth-First](https://aries.ektf.hu/~gkusper/mestint/anim/melysegi.gif)
 - [Breadth-First](https://aries.ektf.hu/~gkusper/mestint/anim/szelessegi.gif)
