@@ -25,15 +25,15 @@ export type Text = TextPiece[]
 export type ClipResult<T extends TextPiece> = { clipped: T, remainder: T }
 /** Splits text at the first newline it finds. */
 export type LineBreakFn = (piece: TextPiece) => ClipResult<TextPiece> | null
+type ExplicitBreak = true
 
 
 export class TextWrapper {
-  // TODO line breaks in text
 
   readonly drawer: Drawer
 
-  public textHeightFactor: number = 0.8 // TODO
-  public atomSpacing: number = 0 // TODO
+  /** Scales strings' measured heights by this. Values <1 make lines condensed, and values >1 make them sparse. */
+  public textHeightFactor: number = 0.8
   public hyphen: string = '‐' // HYPHEN (U+2010)
 
 
@@ -86,12 +86,13 @@ export class TextWrapper {
   *
   * @param maxWidth Optional maximum width to wrap lines at. When left at its default value of `Infinity`, lines will only be split at line breaks.
   * @param style Style used to measure the text. Has no effect if `maxWidth` is `Infinity`.
+  * @param explicitBreakFn Function that will be used to identify explicit line breaks, like `'\n'` in strings. The default implementation is `TextWrapper.defaultLineBreakFn`.
   */
-  public splitLines(text: Text, maxWidth: number = Infinity, style: Partial<FontStyle> = {}): { parts: { piece: TextPiece, size: Size }[], size: Size }[] {
+  public splitLines(sourceText: Text, maxWidth: number = Infinity, style: Partial<FontStyle> = {}, explicitBreakFn: LineBreakFn = TextWrapper.defaultLineBreakFn): { parts: { piece: TextPiece, size: Size }[], size: Size }[] {
     const fullStyle = { ...Drawer.defaultFontStyle, ...style }
 
-    // Shallow-copy the array so that we can manipulate it without affecting the original
-    text = Array.from(text)
+    // This will return a new array that we can manipulate without affecting the original.
+    const text = this.findExplicitBreaks(sourceText, explicitBreakFn)
 
     // Since we will be draining elements from the start of the text, reverse the array so that we can consume from the end instead
     text.reverse()
@@ -120,13 +121,14 @@ export class TextWrapper {
   measure(piece: TextPiece, style: FontStyle): Size {
     if(typeof(piece) === 'string') {
       const metrics = this.drawer.measureText(piece, {}, style)
-      return Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
+      return Size(metrics.width, (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent) * this.textHeightFactor)
     } else {
       return piece.measure(style)
     }
   }
 
-  clipString(text: string, maxWidth: number, style: FontStyle): ClipResult<string> {
+  clipString(text: string, maxWidth: number, style: FontStyle, trimStart: boolean = false, trimEnd: boolean = true): ClipResult<string> {
+    // TODO some kind of heuristic to avoid splitting off 1 letter and looking stupid
     if(this.drawer.measureText(text, {}, style).width <= maxWidth) {
       // Happy path: the text just fits
       return {
@@ -135,13 +137,35 @@ export class TextWrapper {
       }
     }
 
+    function isWhitespace(char: string): boolean {
+      return char.trim() === '' // Genuis!
+    }
+
+    function trimAndAddHyphen(str: string, hyphen: string): string {
+      let start = 0
+      if(trimStart) {
+        while(start < str.length && isWhitespace(str.charAt(start))) {
+          start += 1
+        }
+      }
+
+      let end = str.length
+      if(trimEnd) {
+        while(end > start && isWhitespace(str.charAt(end - 1))) {
+          end -= 1
+        }
+      }
+
+      // Only add the hyphen if the end wasn't trimmed
+      return str.substring(start, end) + ((end < str.length) ? '' : hyphen)
+    }
+
     let min = 1
     let max = text.length
 
     while(min + 1 < max) {
       const mid = Math.floor((min + max) / 2)
-      // TODO trim before measuring
-      const width = this.drawer.measureText(text.substring(0, mid) + this.hyphen, {}, style).width
+      const width = this.drawer.measureText(trimAndAddHyphen(text.substring(0, mid), this.hyphen), {}, style).width
 
       if(width > maxWidth) {
         max = mid
@@ -150,9 +174,8 @@ export class TextWrapper {
       }
     }
 
-    // TODO trim
     return {
-      clipped: text.substring(0, min) + this.hyphen,
+      clipped: trimAndAddHyphen(text.substring(0, min), this.hyphen),
       remainder: text.substring(min)
     }
   }
@@ -188,31 +211,42 @@ export class TextWrapper {
   /** Never breaks. */
   public static readonly neverLineBreakFn: LineBreakFn = (_piece: TextPiece) => null
 
+
+  findExplicitBreaks(text: Text, breakFn: LineBreakFn): (TextPiece | ExplicitBreak)[] {
+    const result: (TextPiece | ExplicitBreak)[] = []
+
+    for(let piece of text) {
+      while(true) {
+        const clipResult = breakFn(piece)
+        if(clipResult === null) {
+          break
+        } else {
+          result.push(clipResult.clipped)
+          result.push(true)
+          piece = clipResult.remainder
+        }
+      }
+
+      result.push(piece)
+    }
+
+    return result
+  }
+
   /**
   * @param text Text to be consumed. It's consumed from the end for efficiency.
-  * @param lineBreakFn Function to use for line breaking. The default implementation is `TextWrapper.defaultLineBreakFn`.
   *
   * @see TextWrapper.defaultLineBreakFn
   */
-  consumeMaximalText(text: Text, maxWidth: number, style: FontStyle, lineBreakFn: LineBreakFn = TextWrapper.defaultLineBreakFn): { piece: TextPiece, size: Size }[] {
+  consumeMaximalText(text: (TextPiece | ExplicitBreak)[], maxWidth: number, style: FontStyle): { piece: TextPiece, size: Size }[] {
     const consumed = []
     let widthLeft: number = maxWidth
 
     while(true) {
-      const nextPiece: TextPiece | undefined = text.pop()
-      if(nextPiece === undefined) break
+      const nextPiece: TextPiece | ExplicitBreak | undefined = text.pop()
+      if(nextPiece === undefined || nextPiece === true /* Explicit break */) break
 
       const size: Size = this.measure(nextPiece, style)
-
-      // Is there an explicit line break?
-      const lineBreak = lineBreakFn(nextPiece)
-      if(lineBreak !== null) {
-        if(typeof(lineBreak.clipped) !== 'string' || lineBreak.clipped.length != 0) {
-          consumed.push({ piece: lineBreak.clipped, size: this.measure(lineBreak.clipped, style) })
-        }
-        text.push(lineBreak.remainder)
-        break
-      }
 
       // Does it fit?
       if(size.width <= widthLeft) {
@@ -240,8 +274,8 @@ export class TextWrapper {
 
     // Make sure we consumed at least one piece so that wrapping doesn't get stuck
     if(consumed.length <= 0) {
-      const piece: TextPiece | undefined = text.pop()
-      if(piece !== undefined) {
+      const piece: TextPiece | ExplicitBreak | undefined = text.pop()
+      if(piece !== undefined && piece !== true) {
         consumed.push({ piece: piece, size: this.measure(piece, style) })
       }
     }
