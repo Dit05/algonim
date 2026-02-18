@@ -1,6 +1,6 @@
 import { Drawer } from './Drawer'
 import { Point, Vector, VectorUtil, Size } from './Primitives'
-import { TextAlign, FontStyle } from '@/gfx/Styles'
+import { FontStyle } from '@/gfx/Styles'
 
 
 export interface TextAtom {
@@ -45,25 +45,22 @@ export class TextWrapper {
   /**
   * Draws text wrapped to a maximum width.
   */
-  public drawText(text: Text, position: Point, maxWidth: number, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}): DrawTextResult {
-    // TODO respect align
-    const fullAlign = { ...Drawer.defaultTextAlign, ...align }
+  public drawText(text: Text, position: Point, maxWidth: number, style: Partial<FontStyle> = {}): DrawTextResult {
     const fullStyle = { ...Drawer.defaultFontStyle, ...style }
 
     const lines = this.splitLines(text, maxWidth, style)
 
-    let y = 0
     let largestWidth = 0
-
+    let y = 0
     for(let line of lines) {
       largestWidth = Math.max(largestWidth, line.size.width)
-
       let x = 0
+
       for(let part of line.parts) {
         const pos: Point = VectorUtil.add(position, Vector(x, y))
 
         if(typeof(part.piece) === 'string') {
-          this.drawer.drawText(part.piece, pos, fullAlign, fullStyle)
+          this.drawer.drawText(part.piece, pos, { align: 'start', baseline: 'top' }, fullStyle)
         } else {
           part.piece.draw(pos, this.drawer, fullStyle)
         }
@@ -100,7 +97,7 @@ export class TextWrapper {
     const lines = []
 
     while(text.length > 0) {
-      const consumed = this.consumeMaximalText(text, maxWidth, fullStyle)
+      const consumed = this.consumeLine(text, maxWidth, fullStyle)
       const line = []
 
       let width = 0
@@ -238,7 +235,7 @@ export class TextWrapper {
   *
   * @see TextWrapper.defaultLineBreakFn
   */
-  consumeMaximalText(text: (TextPiece | ExplicitBreak)[], maxWidth: number, style: FontStyle): { piece: TextPiece, size: Size }[] {
+  consumeLine(text: (TextPiece | ExplicitBreak)[], maxWidth: number, style: FontStyle): { piece: TextPiece, size: Size }[] {
     const consumed = []
     let widthLeft: number = maxWidth
 
@@ -282,6 +279,5 @@ export class TextWrapper {
 
     return consumed
   }
-
 
 }

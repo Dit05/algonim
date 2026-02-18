@@ -1,7 +1,7 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
 import { Point, Size } from '@/gfx/Primitives'
-import { TextAlign, FontStyle } from '@/gfx/Styles'
+import { FontStyle } from '@/gfx/Styles'
 import { TextWrapper } from '@/gfx/TextWrapper'
 import * as CONFIG from '@/config'
 
@@ -69,12 +69,9 @@ export class Code extends Model {
 
   // TODO customizability
   public draw(drawer: Drawer) {
-    const align: TextAlign = { align: 'start', baseline: 'top' }
     const style: Partial<FontStyle> = { fill: 'black' }
-
+    const em: number = drawer.measureText('m', {}, style).width
     const wrapper = new TextWrapper(drawer)
-
-    const em: number = drawer.measureText('m', align, style).width
 
     // TODO numbered lines
     // TODO reintroduce signs as TextWrapper atoms
@@ -88,7 +85,7 @@ export class Code extends Model {
       const indentSize = Code.measureIndent(line.text) * em
 
       const x = gutterWidth + indentSize
-      const drawResult = wrapper.drawText([line.text], Point(x, y), drawer.getSize().width - x, align, style)
+      const drawResult = wrapper.drawText([line.text], Point(x, y), drawer.getSize().width - x, style)
 
       /*
       for(let sign of line.signs) {
