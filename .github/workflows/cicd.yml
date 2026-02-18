@@ -29,10 +29,20 @@ jobs:
         cache: 'npm'
         cache-dependency-path: './algonim/package-lock.json'
 
-    - name: Build
+    - name: Install dependencies
       run: |
         cd algonim
         npm install
+
+    - name: Compatibile licenses only
+      run: |
+        cd algonim
+        # license-checker isn't a dependency, so npx will ask to download it => --yes
+        npx --yes license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;0BSD;Apache-2.0;GPL-3.0;GPL-3.0+;LGPL-3.0;LGPL-3.0+;Unlicense;Python-2.0"
+
+    - name: Build
+      run: |
+        cd algonim
         npm run build
 
     - name: Compose artifact
