@@ -1,0 +1,57 @@
+name: NodeJS with Webpack, then publish to Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: './algonim/package-lock.json'
+
+    - name: Build
+      run: |
+        cd algonim
+        npm install
+        npm run build
+
+    - name: Compose artifact
+      run: |
+        mkdir page
+        cp -r algonim/dist ./page/
+        cp ./algonim/test.html ./page/index.html
+
+    - name: Upload artifact
+      if: matrix.node-version == '22.x' && github.event_name == 'push'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./page
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
