@@ -57,7 +57,7 @@
           }
         }
 
-        code.arrowLine = 0
+        code.arrowLines = 0
 
         alg.setLayout(layout)
 
@@ -67,25 +67,25 @@
         const iSign = code.createSign(0)
         iSign.text = `${i}`
 
-        code.arrowLine = 1
+        code.arrowLines = 1
         await alg.keyframe()
         while(i > 0) {
-          code.arrowLine = 2
+          code.arrowLines = 2
           await alg.keyframe()
           outputLines.push(`${i}`)
           fakeConsole.setLines(outputLines)
           await alg.keyframe()
           i -= 1
           iSign.text = `${i}`
-          code.arrowLine = 3
+          code.arrowLines = 3
           await alg.keyframe()
-          code.arrowLine = 1
+          code.arrowLines = 1
           await alg.keyframe()
         }
-        code.arrowLine = 4
+        code.arrowLines = 4
         await alg.keyframe()
 
-        code.arrowLine = null
+        code.arrowLines = null
         await alg.keyframe()
 
         iSign.destroy()

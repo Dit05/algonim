@@ -5,13 +5,34 @@ import { FontStyle } from '@/gfx/Styles'
 
 export interface TextAtom {
   /** Measures the size of this atom's bounds. */
-  measure(style: FontStyle): Size
+  measure(drawer: Drawer, style: FontStyle): Size
   /** Draws this atom. */
   draw(position: Point, drawer: Drawer, style: FontStyle): void
   /** Tries to clip this atom so that the clipped part is no wider than `maxWidth`, or returns `null` if such clipping is not possible. */
   tryClip(maxWidth: number, style: FontStyle): ClipResult<TextAtom> | null
   /** Whether this atom should be trimmed from the ends of lines, like whitespace. */
   trimFromEnd(): boolean
+}
+
+/**
+* Invisible `TextAtom` implementation that has a specified size.
+*/
+export class SpaceAtom implements TextAtom {
+
+  public size: Size
+  public shouldTrimFromEnd: boolean = true
+
+  public constructor(size: Size) {
+    this.size = size
+  }
+
+  // TextAtom
+  measure(_drawer: Drawer, _style: FontStyle): Size { return this.size }
+  draw(_position: Point, _drawer: Drawer, _style: FontStyle): void { /* do nothing */ }
+  tryClip(_maxWidth: number, _style: FontStyle): ClipResult<TextAtom> | null { return null }
+  trimFromEnd(): boolean { return this.shouldTrimFromEnd }
+  //
+
 }
 
 
@@ -37,7 +58,7 @@ export class TextWrapper {
   public hyphen: string = '‐' // HYPHEN (U+2010)
 
 
-  constructor(drawer: Drawer) {
+  public constructor(drawer: Drawer) {
     this.drawer = drawer
   }
 
@@ -120,7 +141,7 @@ export class TextWrapper {
       const metrics = this.drawer.measureText(piece, {}, style)
       return Size(metrics.width, (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent) * this.textHeightFactor)
     } else {
-      return piece.measure(style)
+      return piece.measure(this.drawer, style)
     }
   }
 

@@ -47,6 +47,14 @@ export function Size(width: number, height: number): Size {
 
 export class SizeUtil {
 
+  public static fromMetricsActual(metrics: TextMetrics): Size {
+    return Size(metrics.width, metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent)
+  }
+
+  public static fromMetricsFont(metrics: TextMetrics): Size {
+    return Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
+  }
+
   public static toVector(size: Size): Vector {
     return Vector(size.width, size.height)
   }
