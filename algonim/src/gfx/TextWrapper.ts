@@ -126,6 +126,8 @@ export class TextWrapper {
 
   clipString(text: string, maxWidth: number, style: FontStyle, trimStart: boolean = false, trimEnd: boolean = true): ClipResult<string> {
     // TODO some kind of heuristic to avoid splitting off 1 letter and looking stupid
+    // TODO avoid splitting groups of codepoints that shouldn't be separated, i.e. '\u{1f3f3}\ufe0f\u200d\u26a7\ufe0f'
+
     if(this.drawer.measureText(text, {}, style).width <= maxWidth) {
       // Happy path: the text just fits
       return {
@@ -134,21 +136,30 @@ export class TextWrapper {
       }
     }
 
-    function isWhitespace(char: string): boolean {
-      return char.trim() === '' // Genuis!
+    function charKind(char: string): 'high surrogate' | 'low surrogate' | 'whitespace' | 'normal' {
+      const cc = char.charCodeAt(0)
+      if(cc >= 0xd800 && cc <= 0xdbff) {
+        return 'high surrogate'
+      } else if(cc >= 0xdc00 && cc <= 0xdfff) {
+        return 'low surrogate'
+      } else if(char.trim() === '') { // Genuis!
+        return 'whitespace'
+      } else {
+        return 'normal'
+      }
     }
 
     function trimAndAddHyphen(str: string, hyphen: string): string {
       let start = 0
       if(trimStart) {
-        while(start < str.length && isWhitespace(str.charAt(start))) {
+        while(start < str.length && charKind(str.charAt(start)) === 'whitespace') {
           start += 1
         }
       }
 
       let end = str.length
       if(trimEnd) {
-        while(end > start && isWhitespace(str.charAt(end - 1))) {
+        while(end > start && charKind(str.charAt(end - 1)) === 'whitespace') {
           end -= 1
         }
       }
@@ -161,7 +172,13 @@ export class TextWrapper {
     let max = text.length
 
     while(min + 1 < max) {
-      const mid = Math.floor((min + max) / 2)
+      let mid = Math.floor((min + max) / 2)
+
+      // Avoid splitting surrogate pairs
+      while(mid > 0 && charKind(text.charAt(mid)) === 'low surrogate') {
+        mid -= 1
+      }
+
       const width = this.drawer.measureText(trimAndAddHyphen(text.substring(0, mid), this.hyphen), {}, style).width
 
       if(width > maxWidth) {
