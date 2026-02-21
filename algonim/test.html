@@ -31,6 +31,8 @@
         ])
 
         const fakeConsole = alg.createModel('code')
+        fakeConsole.numberingStyleOverride = null
+        fakeConsole.numberSeparatorStyle = null
         const outputLines = [ 'Output: (totally not a CodeModel)' ]
         fakeConsole.setLines(outputLines)
 
