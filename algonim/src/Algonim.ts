@@ -1,4 +1,3 @@
-// TODO revise accessibility specifiers everywhere
 import { Point, Size } from '@/gfx/Primitives'
 import { Region } from '@/gfx/Region'
 import { Drawer } from '@/gfx/Drawer'
@@ -6,25 +5,30 @@ import { Model } from '@/models/Model'
 import * as Models from '@/models'
 
 
+/**
+* Algonim's [custom HTML element](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements).
+*/
 export class Algonim extends HTMLElement {
 
-  static observedAttributes = ["delay"]
+  protected static observedAttributes = ["delay"]
 
   // Observed attributes
+  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. @see {@link keyframe} */
   delay: number = 1000
   //
 
-  canvas: HTMLCanvasElement
-  rootPane: Pane | null = null
+  private canvas: HTMLCanvasElement
+  private rootPane: Pane | null = null
 
-  static modelConstructors: { [key: string]: () => Model } = {
-    code: () => new Models.Code(),
-    graph: () => new Models.Graph()
-  }
+  private readonly modelConstructors: { [key: string]: () => Model } = {}
 
 
   constructor() {
     super()
+
+    // Register built-in models
+    this.registerModel('code', () => new Models.Code())
+    this.registerModel('graph', () => new Models.Graph())
 
     // Create shadow canvas
     const shadow = this.attachShadow({ 'mode': 'closed' })
@@ -35,23 +39,23 @@ export class Algonim extends HTMLElement {
   }
 
 
-  connectedCallback() {
+  protected connectedCallback() {
     //console.log("Custom element added to page.")
   }
 
-  disconnectedCallback() {
+  protected disconnectedCallback() {
     //console.log("Custom element removed from page.")
   }
 
-  connectedMoveCallback() {
+  protected connectedMoveCallback() {
     //console.log("Custom element moved with moveBefore()")
   }
 
-  adoptedCallback() {
+  protected adoptedCallback() {
     //console.log("Custom element moved to new page.")
   }
 
-  attributeChangedCallback(name: any, oldValue: any, newValue: any) {
+  protected attributeChangedCallback(name: any, _oldValue: any, newValue: any) {
     //console.log(`Attribute ${name} has changed from ${oldValue} to ${newValue}.`)
     switch(name) {
       case 'delay':
@@ -60,7 +64,7 @@ export class Algonim extends HTMLElement {
     }
   }
 
-  redraw() {
+  private redraw() {
     console.log('Redraw called')
 
     const CONTEXT_ID = '2d'
@@ -69,26 +73,24 @@ export class Algonim extends HTMLElement {
     const ctx = this.canvas.getContext(CONTEXT_ID)
     if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
 
-    const drawer = new Drawer(ctx, new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height)))
+    const fullRegion = new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height))
+    const drawer = new Drawer(ctx, fullRegion, fullRegion)
     drawer.fill("white");
 
     if(this.rootPane !== null) {
       this.rootPane.draw(drawer)
     }
-
-    /*drawer.fill('#ff00ff')
-    drawer = new Drawer(ctx, new Region(ctx.canvas.width / 4, ctx.canvas.height / 4, this.canvas.width / 2, this.canvas.height / 2))
-    drawer.fill('#ff0000')
-    drawer.drawLine(0, 0, 800, 800, "black") // SEE: this line is clipped to the small area*/
   }
 
-  // TODO? inbetweening
-  public async slideshow(func: (alg: Algonim) => Promise<void>): Promise<void> {
+
+  /** Animates a sequence on the element's canvas. The promise is resolved when the animation is over. */
+  public async slideshow(func: SequenceFn): Promise<void> {
     await func(this)
 
     return Promise.resolve()
   }
 
+  /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */
   public async keyframe(delayScale: number = 1) {
     this.redraw()
 
@@ -98,12 +100,27 @@ export class Algonim extends HTMLElement {
     })
   }
 
+  /** Retrieves a list of all registered {@link Model}s' names. */
+  public getModelNames(): string[] {
+    const names = []
+    for(let key in this.modelConstructors) {
+      names.push(key)
+    }
+    return names
+  }
+
+  /** Registers a factory function as a {@link Model}. @see {@link createModel} */
+  public registerModel(name: string, ctor: () => Model) {
+    this.modelConstructors[name] = ctor
+  }
+
+  /** Instantiates a registered {@link Model} based on its name. @see {@link getModelNames} */
   public createModel(name: string): Model {
-    return Algonim.modelConstructors[name]()
+    return this.modelConstructors[name]()
   }
 
 
-  static layoutToPane(layout: Layout, depthLimit: number): Pane {
+  private static layoutToPane(layout: Layout, depthLimit: number): Pane {
     if(depthLimit <= 0) {
       throw new Error('Depth limit reached while scanning layout.')
     }
@@ -131,24 +148,37 @@ export class Algonim extends HTMLElement {
     }
   }
 
+  /** Initializes the hierarchy of {@link Pane}s using the given layout. */
   public setLayout(layout: Layout) {
     this.rootPane = Algonim.layoutToPane(layout, 50)
   }
 
 }
 
+/** Describes a {@link Pane} hierarchy. @see {@link Algonim.setLayout} */
 export type Layout = Model
   | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
   | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
+/** A function that plays an animation sequence. @see {@link Algonim.slideshow} */
+export type SequenceFn = (alg: Algonim) => Promise<void>
 
 
+
+/**
+* Base class for panes displayable by Algonim.
+* @see {@link Layout}
+*/
 export abstract class Pane {
+  /** Draws the pane over the entire area of the given drawer. */
   public abstract draw(drawer: Drawer): void
 }
 
+/**
+* Pane that displays a {@link Model}.
+*/
 export class ModelPane implements Pane {
-  model: Model | null = null
+  public model: Model | null = null
 
   public draw(drawer: Drawer) {
     if(this.model !== null) {
@@ -157,13 +187,19 @@ export class ModelPane implements Pane {
   }
 }
 
-
+/**
+* Pane that displays two other panes within itself. Be careful not to create an infinitely recursing hierarchy!
+*/
 export class SplitPane implements Pane {
-  axis: 'horizontal' | 'vertical' = 'horizontal'
-  ratio: number = 0.5
+  /** Axis along which the plane is split. Mirrors vim's behavior, meaning the separator line's orientation will match that of the split. In other words, a vertical split positions the subpanes side-by-side. */
+  public axis: 'horizontal' | 'vertical' = 'horizontal'
+  /** Controls the proportions of the split. Values closer to 0 reduce the first pane's size, while values closer to 1 increase it. */
+  public ratio: number = 0.5
 
-  first: Pane | null = null
-  second: Pane | null = null
+  /** The left or top pane, depending on the split axis. @see {@link axis} */
+  public first: Pane | null = null
+  /** The right or bottom pane, depending on the split axis. @see {@link axis} */
+  public second: Pane | null = null
 
 
   public draw(drawer: Drawer) {

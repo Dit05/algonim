@@ -8,15 +8,17 @@ import * as CONFIG from '@/config'
 
 export class Line {
   public text: string = ''
-  signs: Sign[] = []
+  /** Signs present on this line. Note that signs need to refer back to their line, so prefer using {@link Sign.constructor} instead of manipulating this directly, as that will automatically add them to the array. */
+  public signs: Sign[] = []
 }
 
-// TODO put a box around it or something
+// TODO draw a box around it or something
+/** An extra bit of text that appears after a line. */
 export class Sign implements TextAtom {
 
-  static readonly ALIGN: TextAlign = { align: 'left', baseline: 'top' }
+  private static readonly ALIGN: TextAlign = { align: 'left', baseline: 'top' }
 
-  line: Line | null
+  private readonly line: Line | null
   public text: string = ''
   public style: SignStyle
 
@@ -113,6 +115,7 @@ export class Code extends Model {
   //
 
 
+  /** Creates one line for every element of the given array. Future modifications to the array won't be reflected by the lines. */
   public setLines(lines: string[]) {
     this.lines = lines.map((str) => {
       const line = new Line()
@@ -121,12 +124,13 @@ export class Code extends Model {
     })
   }
 
+  /** Creates a sign at the end of the given line, numbered from 0. */
   public createSign(lineNumber: number): Sign {
     const line = this.lines[lineNumber]
     return new Sign(line, this.defaultSignStyle)
   }
 
-  static measureAndRemoveIndent(text: string): { indent: number, deindented: string } {
+  private static measureAndRemoveIndent(text: string): { indent: number, deindented: string } {
     let indent = 0
     let removeCount = 0
     for(let i = 0; i < text.length; i++) {

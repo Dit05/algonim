@@ -1,8 +1,9 @@
 import { Point, Size } from './Primitives'
 import { Region } from './Region'
-import { DrawStyle, LineStyle, ArrowStyle, FontStyle, TextAlign } from './Styles'
+import { DrawStyle, LineStyle, ArrowStyle as ArrowheadStyle, FontStyle, TextAlign } from './Styles'
 
 
+/** Extra parameters for {@link Drawer.drawEllipse}. */
 export type EllipseExtras = {
   rotation: number,
   startAngle: number,
@@ -10,10 +11,10 @@ export type EllipseExtras = {
   counterclockwise: boolean
 }
 
+/** Draws onto a {@link Region} of a [CanvasRenderingContext2D](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D). */
 export class Drawer {
 
-  // TODO cascading style sheets support (or something similar)
-  static readonly defaultLineStyle: LineStyle = {
+  private static readonly defaultLineStyle: LineStyle = {
     stroke: 'black',
     lineWidth: 1.0,
     lineCap: 'butt',
@@ -22,8 +23,12 @@ export class Drawer {
     lineDash: [],
     lineDashOffset: 0
   }
+  /** Makes a {@link LineStyle} non-partial by setting missing properties to defaults. */
+  public static completeLineStyle(partial: Partial<LineStyle>): LineStyle {
+    return { ...Drawer.defaultLineStyle, ...partial }
+  }
 
-  static readonly defaultArrowStyle: ArrowStyle = {
+  private static readonly defaultArrowheadStyle: ArrowheadStyle = {
     /**
     * "Shallowness" of the arrow.
     * 0°: prongs point back towards the start point
@@ -32,8 +37,12 @@ export class Drawer {
     angleDegrees: 45,
     length: 10
   }
+  /** Makes a {@link ArrowheadStyle} non-partial by setting missing properties to defaults. */
+  public static completeArrowheadStyle(partial: Partial<ArrowheadStyle>): ArrowheadStyle {
+    return { ...Drawer.defaultArrowheadStyle, ...partial }
+  }
 
-  static readonly defaultFontStyle: FontStyle = {
+  private static readonly defaultFontStyle: FontStyle = {
     fill: 'black',
     line: null,
     font: '24px sans',
@@ -43,55 +52,100 @@ export class Drawer {
     textBaseline: 'alphabetic',
     letterSpacing: '0px'
   }
+  /** Makes a {@link FontStyle} non-partial by setting missing properties to defaults. */
+  public static completeFontStyle(partial: Partial<FontStyle>): FontStyle {
+    return { ...Drawer.defaultFontStyle, ...partial }
+  }
 
-  static readonly defaultTextAlign: TextAlign = {
+  private static readonly defaultTextAlign: TextAlign = {
     align: 'center',
     baseline: 'middle'
   }
+  /** Makes a {@link TextAlign} non-partial by setting missing properties to defaults. */
+  public static completeTextAlign(partial: Partial<TextAlign>): TextAlign {
+    return { ...Drawer.defaultTextAlign, ...partial }
+  }
 
 
-  readonly context: CanvasRenderingContext2D
-  readonly region: Region
-  readonly origin: Point
+  private readonly context: CanvasRenderingContext2D
+  private readonly region: Region
+  private readonly clipRegion: Region
+  private readonly origin: Point
 
 
-  constructor(context: CanvasRenderingContext2D, region: Region, origin: Point = Point(0, 0)) {
+  /**
+  * Constructs a new drawer from a raw rendering context. This is likely not what you want, if you're just making a sequence.
+  *
+  * The rationale for there being two different regions is that it's convenient for some algorithms to have a well-defined area for them to draw their graphic in.
+  * Passing the clipping region itself to such algorithms would cause unexpected results when the clipping region itself has to be clipped within a parent drawer.
+  *
+  * @param context The rendering context to draw onto.
+  * @param region Area for drawing, in canvas coordinates.
+  * @param clipRegion Area where drawing is actually visible, in canvas coordinates.
+  * @param origin The place where (0, 0) is within the drawing region.
+  *
+  * @see {@link gfx/Border.EllipseBorder.draw} for an example of something that would behave unexpectedly.
+  */
+  public constructor(context: CanvasRenderingContext2D, region: Region, clipRegion: Region, origin: Point = Point(0, 0)) {
     this.context = context
     this.region = region
+    this.clipRegion = clipRegion
     this.origin = origin
   }
 
 
+  /**
+  * Creates a sub-drawer that draws to the same context as this one, but clipped to a lesser or equal region.
+  *
+  * @param region Area where the resulting sub-drawer will draw, in the coordinates of the current drawer's region. The sub-drawer's clipping region will be constrained to the clipping region of this instance.
+  *
+  * @see {@link constructor} for why there is a separate drawing and clipping region.
+  */
   public subregion(region: Region): Drawer {
-    return new Drawer(this.context, this.region.subregion(region))
+    const sub = this.region.subregion(region, false)
+    return new Drawer(this.context, sub, sub.clippedBy(this.clipRegion))
   }
 
+  /** Creates a copy of this but with a different origin. */
   public withTranslatedOrigin(origin: Point): Drawer {
-    return new Drawer(this.context, this.region, Point(this.origin.x + origin.x, this.origin.y + origin.y))
+    return new Drawer(this.context, this.region, this.clipRegion, Point(this.origin.x + origin.x, this.origin.y + origin.y))
   }
 
-  public getSize(): Size {
-    return this.region.size
-  }
+  /**
+  * Gets the size of the drawing region.
+  *
+  * @see {@link getClipSize} if you want the size of the clipping region instead.
+  * @see {@link constructor} for why there is a separate drawing and clipping region.
+  */
+  public getSize(): Size { return this.region.size }
 
+  /**
+  * Gets the size of the clipping region.
+  *
+  * @see {@link getClipSize} if you want the size of the drawing region instead.
+  * @see {@link constructor} for why there is a separate drawing and clipping region.
+  */
+  public getClipSize(): Size { return this.clipRegion.size }
+
+  /** Creates a region with an origin of (0, 0) and a size of {@link getSize}. */
   public getLocalRegion(): Region {
     return new Region(Point(0, 0), this.region.size)
   }
 
 
-  doClipped(fn: () => void, skipOrigin: boolean = false) {
+  private doClipped(fn: () => void, skipOrigin: boolean = false) {
     this.context.save()
-    this.context.translate(this.region.origin.x, this.region.origin.y)
     this.context.beginPath()
-    this.context.rect(0, 0, this.region.size.width, this.region.size.height)
+    this.context.rect(this.clipRegion.origin.x, this.clipRegion.origin.y, this.clipRegion.size.width, this.clipRegion.size.height)
     this.context.clip()
+    this.context.translate(this.region.origin.x, this.region.origin.y)
     if(!skipOrigin) this.context.translate(this.origin.x, this.origin.y)
     fn()
     this.context.restore()
   }
 
-  applyLineStyle(style: Partial<LineStyle>) {
-    const effectiveStyle: LineStyle = { ...Drawer.defaultLineStyle, ...style }
+  private applyLineStyle(style: Partial<LineStyle>) {
+    const effectiveStyle: LineStyle = Drawer.completeLineStyle(style)
     this.context.strokeStyle = effectiveStyle.stroke
     this.context.lineWidth = effectiveStyle.lineWidth
     this.context.lineCap = effectiveStyle.lineCap
@@ -101,18 +155,18 @@ export class Drawer {
     this.context.lineDashOffset = effectiveStyle.lineDashOffset
   }
 
-  applyFillStyle(style: DrawStyle) {
+  private applyFillStyle(style: DrawStyle) {
     this.context.fillStyle = style
   }
 
-  applyTextAlign(align: Partial<TextAlign>) {
-    const effectiveAlign: TextAlign = { ...Drawer.defaultTextAlign, ...align }
+  private applyTextAlign(align: Partial<TextAlign>) {
+    const effectiveAlign: TextAlign = Drawer.completeTextAlign(align)
     this.context.textAlign = effectiveAlign.align
     this.context.textBaseline = effectiveAlign.baseline
   }
 
-  applyFontStyle(style: Partial<FontStyle>) {
-    const effectiveStyle: FontStyle = { ...Drawer.defaultFontStyle, ...style }
+  private applyFontStyle(style: Partial<FontStyle>) {
+    const effectiveStyle: FontStyle = Drawer.completeFontStyle(style)
     this.context.font = effectiveStyle.font
     this.context.fontKerning = effectiveStyle.fontKerning
     this.context.fontStretch = effectiveStyle.fontStretch
@@ -128,10 +182,13 @@ export class Drawer {
     }
   }
 
+
+  /** Draws a line between two points. */
   public drawLine(start: Point, end: Point, style: Partial<LineStyle> = {}) {
     this.drawMultiLine([start, end], style)
   }
 
+  /** Draws a line through multiple points. Line drawing only takes place if the iterable yields at least two points. */
   public drawMultiLine(points: Iterable<Point>, style: Partial<LineStyle>) {
     this.doClipped(() => {
       this.context.beginPath()
@@ -152,8 +209,15 @@ export class Drawer {
   }
 
 
-  public drawArrowhead(start: Point, end: Point, lineStyle: Partial<LineStyle> = {}, arrowStyle: Partial<ArrowStyle> = {}) {
-    const effectiveArrowStyle: ArrowStyle = { ...Drawer.defaultArrowStyle, ...arrowStyle }
+  /**
+  * Draws the head of an arrow at the end of the specified line.
+  *
+  * A full arrow can be drawn by calling {@link drawLine} with the same points.
+  *
+  * A two-headed arrow can be drawn by calling this again, but with the start and end points swapped.
+  */
+  public drawArrowhead(start: Point, end: Point, lineStyle: Partial<LineStyle> = {}, arrowheadStyle: Partial<ArrowheadStyle> = {}) {
+    const effectiveArrowStyle: ArrowheadStyle = Drawer.completeArrowheadStyle(arrowheadStyle)
 
     const radians = effectiveArrowStyle.angleDegrees / 180.0 * Math.PI
     const sin = Math.sin(radians)
@@ -178,6 +242,7 @@ export class Drawer {
   }
 
 
+  /** Draws an ellipse. @see [CanvasRenderingContext2D.ellipse](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse) */
   public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
     this.doClipped(() => {
 
@@ -208,12 +273,13 @@ export class Drawer {
   }
 
 
+  /** Draws some text. You can use {@link gfx/TextWrapper.TextWrapper} if you need wrapping. */
   public drawText(text: string, position: Point, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
     // TODO account for non-individually customizable stuff like textRendering
-    const effectiveStyle: FontStyle = { ...Drawer.defaultFontStyle, ...style }
+    const effectiveStyle: FontStyle = Drawer.completeFontStyle(style)
 
     this.doClipped(() => {
-      this.applyFontStyle(style)
+      this.applyFontStyle(effectiveStyle)
       this.applyTextAlign(align)
 
       if(effectiveStyle.fill !== null) {
@@ -225,6 +291,7 @@ export class Drawer {
     })
   }
 
+  /** Measures some text. Useful for making judgements about how to draw it. @see [TextMetrics](https://developer.mozilla.org/en-US/docs/Web/API/TextMetrics) */
   public measureText(text: string, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}): TextMetrics {
     let measured: TextMetrics | null = null
 
@@ -242,6 +309,7 @@ export class Drawer {
   }
 
 
+  /** Fills the entire drawing area. */
   public fill(fillStyle: DrawStyle) {
     this.doClipped(() => {
       this.context.fillStyle = fillStyle;
@@ -250,9 +318,9 @@ export class Drawer {
   }
 
   /**
-  * Escape hatch that gives you direct access to the CanvasRenderingContext2D.
+  * Escape hatch that gives you direct access to the underlying [CanvasRenderingContext2D](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D).
   *
-  * SAFETY: The drawing state stack MUST NOT be different after your closure returns! This is to prevent future drawing operations from being affected.
+  * SAFETY: The drawing state stack MUST NOT be different after your function returns! This is to prevent future drawing operations from being affected.
   */
   public drawFreeform(fn: (ctx: CanvasRenderingContext2D) => void) {
     this.doClipped(() => {

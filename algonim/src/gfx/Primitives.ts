@@ -1,7 +1,11 @@
+/** @packageDocumentation Common types used in drawing. */
 
 
+/** A point on the Carthesian plane. */
 export type Point = {
+  /** Abscissa. */
   x: number,
+  /** Ordinate. */
   y: number
 }
 
@@ -10,6 +14,7 @@ export function Point(x: number, y: number): Point {
 }
 
 
+/** A vector on the Carthesian plane. */
 export type Vector = {
   x: number,
   y: number
@@ -36,6 +41,7 @@ export class VectorUtil {
 }
 
 
+/** A width and a height. */
 export type Size = {
   width: number,
   height: number

@@ -3,6 +3,7 @@ import { Point, Vector, VectorUtil, Size } from './Primitives'
 import { FontStyle } from '@/gfx/Styles'
 
 
+/** Something that can be drawn inline with text. */
 export interface TextAtom {
   /** Measures the size of this atom's bounds. */
   measure(drawer: Drawer, style: FontStyle): Size
@@ -14,9 +15,7 @@ export interface TextAtom {
   trimFromEnd(): boolean
 }
 
-/**
-* Invisible `TextAtom` implementation that has a specified size.
-*/
+/** Invisible `TextAtom` implementation that has a specified size. */
 export class SpaceAtom implements TextAtom {
 
   public size: Size
@@ -46,7 +45,9 @@ export type Text = TextPiece[]
 export type ClipResult<T extends TextPiece> = { clipped: T, remainder: T }
 /** Splits text at the first newline it finds. */
 export type LineBreakFn = (piece: TextPiece) => ClipResult<TextPiece> | null
-type ExplicitBreak = true
+
+const EXPLICIT_BREAK = Symbol("explicit line break")
+type ExplicitBreak = typeof EXPLICIT_BREAK
 
 
 export class TextWrapper {
@@ -55,6 +56,7 @@ export class TextWrapper {
 
   /** Scales strings' measured heights by this. Values <1 make lines condensed, and values >1 make them sparse. */
   public textHeightFactor: number = 0.8
+  /** String inserted at the end of a line when two non-whitespace characters are separated. */
   public hyphen: string = '‐' // HYPHEN (U+2010)
 
 
@@ -67,7 +69,7 @@ export class TextWrapper {
   * Draws text wrapped to a maximum width.
   */
   public drawText(text: Text, position: Point, maxWidth: number, style: Partial<FontStyle> = {}): DrawTextResult {
-    const fullStyle = { ...Drawer.defaultFontStyle, ...style }
+    const fullStyle = Drawer.completeFontStyle(style)
 
     const lines = this.splitLines(text, maxWidth, style)
 
@@ -107,7 +109,7 @@ export class TextWrapper {
   * @param explicitBreakFn Function that will be used to identify explicit line breaks, like `'\n'` in strings. The default implementation is `TextWrapper.defaultLineBreakFn`.
   */
   public splitLines(sourceText: Text, maxWidth: number = Infinity, style: Partial<FontStyle> = {}, explicitBreakFn: LineBreakFn = TextWrapper.defaultLineBreakFn): { parts: { piece: TextPiece, size: Size }[], size: Size }[] {
-    const fullStyle = { ...Drawer.defaultFontStyle, ...style }
+    const fullStyle = Drawer.completeFontStyle(style)
 
     // This will return a new array that we can manipulate without affecting the original.
     const text = this.findExplicitBreaks(sourceText, explicitBreakFn)
@@ -136,7 +138,7 @@ export class TextWrapper {
   }
 
 
-  measure(piece: TextPiece, style: FontStyle): Size {
+  private measure(piece: TextPiece, style: FontStyle): Size {
     if(typeof(piece) === 'string') {
       const metrics = this.drawer.measureText(piece, {}, style)
       return Size(metrics.width, (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent) * this.textHeightFactor)
@@ -145,7 +147,7 @@ export class TextWrapper {
     }
   }
 
-  clipString(text: string, maxWidth: number, style: FontStyle, trimStart: boolean = false, trimEnd: boolean = true): ClipResult<string> {
+  private clipString(text: string, maxWidth: number, style: FontStyle, trimStart: boolean = false, trimEnd: boolean = true): ClipResult<string> {
     // TODO some kind of heuristic to avoid splitting off 1 letter and looking stupid
     // TODO avoid splitting groups of codepoints that shouldn't be separated, i.e. '\u{1f3f3}\ufe0f\u200d\u26a7\ufe0f'
 
@@ -247,7 +249,7 @@ export class TextWrapper {
   public static readonly neverLineBreakFn: LineBreakFn = (_piece: TextPiece) => null
 
 
-  findExplicitBreaks(text: Text, breakFn: LineBreakFn): (TextPiece | ExplicitBreak)[] {
+  private findExplicitBreaks(text: Text, breakFn: LineBreakFn): (TextPiece | ExplicitBreak)[] {
     const result: (TextPiece | ExplicitBreak)[] = []
 
     for(let piece of text) {
@@ -257,7 +259,7 @@ export class TextWrapper {
           break
         } else {
           result.push(clipResult.clipped)
-          result.push(true)
+          result.push(EXPLICIT_BREAK)
           piece = clipResult.remainder
         }
       }
@@ -273,13 +275,13 @@ export class TextWrapper {
   *
   * @see TextWrapper.defaultLineBreakFn
   */
-  consumeLine(text: (TextPiece | ExplicitBreak)[], maxWidth: number, style: FontStyle): { piece: TextPiece, size: Size }[] {
+  private consumeLine(text: (TextPiece | ExplicitBreak)[], maxWidth: number, style: FontStyle): { piece: TextPiece, size: Size }[] {
     const consumed = []
     let widthLeft: number = maxWidth
 
     while(true) {
       const nextPiece: TextPiece | ExplicitBreak | undefined = text.pop()
-      if(nextPiece === undefined || nextPiece === true /* Explicit break */) break
+      if(nextPiece === undefined || nextPiece === EXPLICIT_BREAK) break
 
       const size: Size = this.measure(nextPiece, style)
 
@@ -310,7 +312,7 @@ export class TextWrapper {
     // Make sure we consumed at least one piece so that wrapping doesn't get stuck
     if(consumed.length <= 0) {
       const piece: TextPiece | ExplicitBreak | undefined = text.pop()
-      if(piece !== undefined && piece !== true) {
+      if(piece !== undefined && piece !== EXPLICIT_BREAK) {
         consumed.push({ piece: piece, size: this.measure(piece, style) })
       }
     }
