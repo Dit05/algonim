@@ -1,3 +1,4 @@
+// TODO revise accessibility specifiers everywhere
 import { Point, Size } from '@/gfx/Primitives'
 import { Region } from '@/gfx/Region'
 import { Drawer } from '@/gfx/Drawer'
@@ -136,17 +137,17 @@ export class Algonim extends HTMLElement {
 
 }
 
-type Layout = Model
+export type Layout = Model
   | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
   | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
 
 
-abstract class Pane {
+export abstract class Pane {
   public abstract draw(drawer: Drawer): void
 }
 
-class ModelPane implements Pane {
+export class ModelPane implements Pane {
   model: Model | null = null
 
   public draw(drawer: Drawer) {
@@ -157,7 +158,7 @@ class ModelPane implements Pane {
 }
 
 
-class SplitPane implements Pane {
+export class SplitPane implements Pane {
   axis: 'horizontal' | 'vertical' = 'horizontal'
   ratio: number = 0.5
 

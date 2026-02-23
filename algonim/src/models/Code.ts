@@ -6,8 +6,8 @@ import { TextWrapper, TextAtom, ClipResult, Text, SpaceAtom } from '@/gfx/TextWr
 import * as CONFIG from '@/config'
 
 
-class Line {
-  text: string = ''
+export class Line {
+  public text: string = ''
   signs: Sign[] = []
 }
 
@@ -60,7 +60,7 @@ export type SignStyle = {
 
 export class Code extends Model {
 
-  lines: Line[] = []
+  private lines: Line[] = []
   /** Lines that should have an arrow before them. Can be a `number`, a `function` mapping line numbers to `boolean`s, or `null` to not have any arrows. */
   public arrowLines: number | ((line: number) => boolean) | null = null
 
@@ -70,7 +70,7 @@ export class Code extends Model {
 
   /** Style applied to most text. */
   public textStyle: Partial<FontStyle> = {}
-  /** Squash/stretch the distance between lines. */
+  /** {@inheritDoc gfx/TextWrapper.TextWrapper.textHeightFactor} */
   public textHeightFactor: number = 0.8
 
   /** Distance between the end of the line and the start of `Sign`s. */

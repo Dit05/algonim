@@ -38,18 +38,24 @@ jobs:
       run: |
         cd algonim
         # license-checker isn't a dependency, so npx will ask to download it => --yes
-        npx --yes license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;0BSD;Apache-2.0;GPL-3.0;GPL-3.0+;LGPL-3.0;LGPL-3.0+;Unlicense;Python-2.0"
+        ./license-checker.sh --yes
 
     - name: Build
       run: |
         cd algonim
         npm run build
 
+    - name: Generate docs with TypeDoc
+      run: |
+        cd algonim
+        npx typedoc
+
     - name: Compose artifact
       run: |
         mkdir page
         cp -r algonim/dist ./page/
-        cp ./algonim/test.html ./page/index.html
+        cp -r algonim/docs ./page/
+        cp ./algonim/index.html ./page/index.html
 
     - name: Upload artifact
       if: matrix.node-version == '22.x' && github.event_name == 'push'
@@ -61,7 +67,8 @@ jobs:
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    - name: Deploy artifact to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
