@@ -19,17 +19,10 @@ export class Algonim extends HTMLElement {
   //
 
   private canvas: HTMLCanvasElement
-  private rootPane: Pane | null = null
-
-  private readonly modelConstructors: { [key: string]: () => Model } = {}
 
 
-  constructor() {
+  public constructor() {
     super()
-
-    // Register built-in models
-    this.registerModel('code', () => new Models.Code())
-    this.registerModel('graph', () => new Models.Graph())
 
     // Create shadow canvas
     const shadow = this.attachShadow({ 'mode': 'closed' })
@@ -71,70 +64,88 @@ export class Algonim extends HTMLElement {
     return canvas
   }
 
-  redraw(canvas: HTMLCanvasElement | undefined = undefined /* Do NOT use `this` in parameter defaults, since it won't be bound yet */): Drawer {
-    if(canvas === undefined) canvas = this.canvas
-
-    const CONTEXT_ID = '2d'
-
-    // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
-    const ctx = canvas.getContext(CONTEXT_ID)
-    if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
-
-    const fullRegion = new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height))
-    const drawer = new Drawer(ctx, fullRegion, fullRegion)
-    drawer.fill("white");
-
-    if(this.rootPane !== null) {
-      this.rootPane.draw(drawer)
-    }
-
-    return drawer
+  public slideshow(func: (seq: Sequence) => Promise<void>): Promise<void> {
+    // TODO do something about concurrent runs
+    const seq = new Sequence(this.canvas)
+    seq.delay = this.delay
+    return func(seq)
   }
 
-  /** Animates a sequence on the element's canvas. The promise is resolved when the animation is over. */
-  public slideshow(func: (alg: Algonim) => Promise<void>): Promise<void> {
-    return func(this)
-  }
-
-  // FIXME why does this make the main animation finish instantly?
-  public recordGif(func: (alg: Algonim) => Promise<void>): Promise<void> {
+  public recordGif(func: (seq: Sequence) => Promise<void>): Promise<void> {
     const gifCanvas = this.createCanvas()
     const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
-    const handler: ProxyHandler<this> = {
-      // TODO type-safe proxying with advanced TS magic
-      get(target, prop, receiver): any {
-        if(prop === 'keyframe') {
-          // Modify the keyframe method
-          return function(this: Algonim, _bogusDelayScale: number = 1): Promise<void> {
-            // Redirect drawing to our GIF canvas
-            const drawer = this.redraw(gifCanvas)
-
-            const data = drawer.getImageData({ colorSpace: 'srgb' }).data
-            let hash = 0
-            for(let i = 0; i < data.length; i++) {
-              hash = (hash + 7*data[i]) % 149
-            }
-            console.log(`GIF FRAME (${hash})`)
-            gif.addFrame(data)
-
-            return new Promise((resolve) => {
-              setTimeout(resolve, 0) // Genuis! 0 delay will just yield.
-            })
-          }
-        } else {
-          // Return the thing from the target object
-          let original = Reflect.get(target, prop, receiver)
-          if(typeof(original) === 'function') {
-            original = original.bind(target) // For some reason, this is needed to "maintain context" or something.
-          }
-          return original
-        }
+    const consumer: ImageDataConsumerFn = function(img: ImageData) {
+      let hash = 0
+      for(let i = 0; i < img.data.length; i++) {
+        hash = (hash + 7*img.data[i]) % 149
       }
+      console.log(`GIF FRAME (${hash})`)
+      // TODO accept ImageData directly
+      gif.addFrame(img.data)
     }
 
-    const proxy = new Proxy(this, handler)
-    return func(proxy)
+    const seq = new Sequence(gifCanvas)
+    seq.addImageDataConsumer(consumer)
+    return func(seq)
+  }
+
+}
+
+// TODO the ability to cancel
+class Sequence {
+
+  protected readonly canvas: HTMLCanvasElement
+  private readonly modelConstructors: { [key: string]: () => Model } = {}
+  private readonly imageDataConsumers: ImageDataConsumerFn[] = []
+
+  protected rootPane: Pane | null = null
+  public delay: number = 0
+
+
+  public constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas
+
+    // Register built-in models
+    this.registerModel('code', () => new Models.Code())
+    this.registerModel('graph', () => new Models.Graph())
+  }
+
+
+  public addImageDataConsumer(consumer: ImageDataConsumerFn) {
+    this.imageDataConsumers.push(consumer)
+  }
+
+  private static layoutToPane(layout: Layout, depthLimit: number): Pane {
+    if(depthLimit <= 0) {
+      throw new Error('Depth limit reached while scanning layout.')
+    }
+
+    if(layout instanceof Model) {
+      const pane = new ModelPane()
+      pane.model = layout
+      return pane
+    } else if(layout.split === 'horizontal') {
+      const pane = new SplitPane()
+      pane.axis = layout.split
+      if(layout.ratio !== undefined) pane.ratio = layout.ratio
+      pane.first = layout.top !== undefined && layout.top !== null ? Sequence.layoutToPane(layout.top, depthLimit - 1) : null
+      pane.second = layout.bottom !== undefined && layout.bottom !== null ? Sequence.layoutToPane(layout.bottom, depthLimit - 1) : null
+      return pane
+    } else if(layout.split === 'vertical') {
+      const pane = new SplitPane()
+      pane.axis = layout.split
+      if(layout.ratio !== undefined) pane.ratio = layout.ratio
+      pane.first = layout.left !== undefined && layout.left !== null ? Sequence.layoutToPane(layout.left, depthLimit - 1) : null
+      pane.second = layout.right !== undefined && layout.right !== null ? Sequence.layoutToPane(layout.right, depthLimit - 1) : null
+      return pane
+    } else {
+      throw new TypeError('Invalid layout.')
+    }
+  }
+
+  public setLayout(layout: Layout) {
+    this.rootPane = Sequence.layoutToPane(layout, 50)
   }
 
   /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */
@@ -166,38 +177,30 @@ export class Algonim extends HTMLElement {
     return this.modelConstructors[name]()
   }
 
+  redraw(): Drawer {
+    const CONTEXT_ID = '2d'
 
-  private static layoutToPane(layout: Layout, depthLimit: number): Pane {
-    if(depthLimit <= 0) {
-      throw new Error('Depth limit reached while scanning layout.')
+    // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
+    const ctx = this.canvas.getContext(CONTEXT_ID)
+    if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
+
+    const fullRegion = new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height))
+    const drawer = new Drawer(ctx, fullRegion, fullRegion)
+    drawer.fill("white");
+
+    if(this.rootPane !== null) {
+      this.rootPane.draw(drawer)
     }
 
-    if(layout instanceof Model) {
-      const pane = new ModelPane()
-      pane.model = layout
-      return pane
-    } else if(layout.split === 'horizontal') {
-      const pane = new SplitPane()
-      pane.axis = layout.split
-      if(layout.ratio !== undefined) pane.ratio = layout.ratio
-      pane.first = layout.top !== undefined && layout.top !== null ? Algonim.layoutToPane(layout.top, depthLimit - 1) : null
-      pane.second = layout.bottom !== undefined && layout.bottom !== null ? Algonim.layoutToPane(layout.bottom, depthLimit - 1) : null
-      return pane
-    } else if(layout.split === 'vertical') {
-      const pane = new SplitPane()
-      pane.axis = layout.split
-      if(layout.ratio !== undefined) pane.ratio = layout.ratio
-      pane.first = layout.left !== undefined && layout.left !== null ? Algonim.layoutToPane(layout.left, depthLimit - 1) : null
-      pane.second = layout.right !== undefined && layout.right !== null ? Algonim.layoutToPane(layout.right, depthLimit - 1) : null
-      return pane
-    } else {
-      throw new TypeError('Invalid layout.')
+    // Pass image data to consumers (if any)
+    if(this.imageDataConsumers.length > 0) {
+      const img: ImageData = drawer.getImageData({ colorSpace: 'srgb' })
+      for(let consumer of this.imageDataConsumers) {
+        consumer(img)
+      }
     }
-  }
 
-  /** Initializes the hierarchy of {@link Pane}s using the given layout. */
-  public setLayout(layout: Layout) {
-    this.rootPane = Algonim.layoutToPane(layout, 50)
+    return drawer
   }
 
 }
@@ -209,6 +212,8 @@ export type Layout = Model
 
 /** A function that plays an animation sequence. @see {@link Algonim.slideshow} */
 export type SequenceFn = (alg: Algonim) => Promise<void>
+
+export type ImageDataConsumerFn = (img: ImageData) => void
 
 
 

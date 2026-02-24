@@ -24,8 +24,8 @@
     <script defer="defer">
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
-      const animationFunc = async (alg) => {
-        const code = alg.createModel('code')
+      const animationFunc = async (seq) => {
+        const code = seq.createModel('code')
         code.setLines([
           'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
           'while i>0 do',
@@ -34,13 +34,13 @@
           'done'
         ])
 
-        const fakeConsole = alg.createModel('code')
+        const fakeConsole = seq.createModel('code')
         fakeConsole.numberingStyleOverride = null
         fakeConsole.numberSeparatorStyle = null
         const outputLines = [ 'Output: (totally not a CodeModel)' ]
         fakeConsole.setLines(outputLines)
 
-        const graph = alg.createModel('graph')
+        const graph = seq.createModel('graph')
         let node = graph.createNode()
         node.position.x = 48
         node.position.y = 48
@@ -71,38 +71,38 @@
 
         code.arrowLines = 0
 
-        alg.setLayout(layout)
+        seq.setLayout(layout)
 
-        await alg.keyframe()
+        await seq.keyframe()
 
         let i = 3
         const iSign = code.createSign(0)
         iSign.text = `${i}`
 
         code.arrowLines = 1
-        await alg.keyframe()
+        await seq.keyframe()
         while(i > 0) {
           code.arrowLines = 2
-          await alg.keyframe()
+          await seq.keyframe()
           outputLines.push(`${i}`)
           fakeConsole.setLines(outputLines)
-          await alg.keyframe()
+          await seq.keyframe()
           i -= 1
           iSign.text = `${i}`
           code.arrowLines = 3
-          await alg.keyframe()
+          await seq.keyframe()
           code.arrowLines = 1
-          await alg.keyframe()
+          await seq.keyframe()
         }
         code.arrowLines = 4
-        await alg.keyframe()
+        await seq.keyframe()
 
         code.arrowLines = null
-        await alg.keyframe()
+        await seq.keyframe()
 
         iSign.destroy()
         code.createSign(4).text = 'Fin.'
-        await alg.keyframe()
+        await seq.keyframe()
       }
 
       algonim.slideshow(animationFunc)
