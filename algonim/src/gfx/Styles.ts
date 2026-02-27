@@ -1,3 +1,4 @@
+/** @packageDocumentation See [CanvasRenderingContext2D on MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D). */
 
 
 export type DrawStyle = string | CanvasGradient | CanvasPattern
@@ -35,8 +36,6 @@ export type TextAlign = {
 
 /**
 * Adapts a CanvasTextDrawingStyles into Algonim's more constrained text style types.
-*
-* @see{CanvasTextDrawingStyles} The consumed type.
 */
 export function adaptCanvasTextDrawingStyle(drawing: CanvasTextDrawingStyles): { style: FontStyle, align: TextAlign } {
   return {

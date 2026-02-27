@@ -1,16 +1,17 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
-import { Point, Size, SizeUtil, Vector, VectorUtil } from '@/gfx/Primitives'
+import { Point, Size, SizeUtil, VectorUtil } from '@/gfx/Primitives'
 import { TextAlign } from '@/gfx/Styles'
 import { Border, EllipseBorder } from '@/gfx/Border'
 import { Region } from '@/gfx/Region'
 import * as CONFIG from '@/config'
 
 
+/** Connects two {@link Node}s. */
 export class Edge {
-  bidirectional: boolean // TODO 2 arrows
-  source: Node
-  destination: Node
+  private bidirectional: boolean
+  private source: Node
+  private destination: Node
 
 
   public constructor(source: Node, destination: Node, bidirectional: boolean) {
@@ -25,15 +26,8 @@ export class Edge {
   }
 
 
-  static getArray(node: Node, direction: 'incoming' | 'outgoing'): Edge[] {
-    switch(direction) {
-      case 'incoming': return node.incoming
-      case 'outgoing': return node.outgoing
-    }
-  }
-
-  link(node: Node, direction: 'incoming' | 'outgoing') {
-    const array = Edge.getArray(node, direction)
+  private link(node: Node, direction: 'incoming' | 'outgoing') {
+    const array = node.getRawArray(direction)
     const index = array.indexOf(this)
 
     if(CONFIG.CONSISTENCY_CHECKS && array.indexOf(this) !== -1) {
@@ -45,8 +39,8 @@ export class Edge {
     array.push(this)
   }
 
-  unlink(node: Node, direction: 'incoming' | 'outgoing') {
-    const array = Edge.getArray(node, direction)
+  private unlink(node: Node, direction: 'incoming' | 'outgoing') {
+    const array = node.getRawArray(direction)
     const index = array.indexOf(this)
 
     if(index === -1) return // Not present, don't do anything
@@ -60,17 +54,17 @@ export class Edge {
     return true
   }
 
-  checkInvariants() {
+  private checkInvariants() {
     if(!CONFIG.CONSISTENCY_CHECKS) return
 
-    if(this.source.outgoing.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in outgoing array of source')
-    if(this.destination.incoming.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in incoming array of destination')
+    if(this.source.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in outgoing array of source')
+    if(this.destination.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in incoming array of destination')
     if(this.bidirectional) {
-      if(this.source.incoming.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in incoming array of source')
-      if(this.destination.outgoing.indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in outgoing array of destination')
+      if(this.source.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in incoming array of source')
+      if(this.destination.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in outgoing array of destination')
     } else {
-      if(this.source.incoming.indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in incoming array of source')
-      if(this.destination.outgoing.indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in outgoing array of destination')
+      if(this.source.getRawArray('incoming').indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in incoming array of source')
+      if(this.destination.getRawArray('outgoing').indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in outgoing array of destination')
     }
   }
 
@@ -137,10 +131,11 @@ export class Edge {
   }
 }
 
+/** Graph node with a position that can contain any value. */
 export class Node {
 
-  incoming: Edge[] = []
-  outgoing: Edge[] = []
+  private incoming: Edge[] = []
+  private outgoing: Edge[] = []
 
   public position: Point = Point(0, 0)
   public value: any = null
@@ -148,10 +143,27 @@ export class Node {
   public border: Border | null = null
 
 
+  /** Gets one of the internal edge arrays. It is not recommended to modify these. */
+  public getRawArray(direction: 'incoming' | 'outgoing'): Edge[] {
+    switch(direction) {
+      case 'incoming': return this.incoming
+      case 'outgoing': return this.outgoing
+    }
+  }
+
   public connect(other: Node, bidirectional: boolean = false): Edge {
     return new Edge(this, other, bidirectional)
   }
 
+  public *getIncomingEdges(): Generator<Edge> {
+    for(let edge of this.incoming) yield edge
+  }
+
+  public *getOutgoingEdges(): Generator<Edge> {
+    for(let edge of this.outgoing) yield edge
+  }
+
+  /** Creats an array of all nodes reachable via edges, always including this one. */
   public discoverLinkedNodes(): Node[] {
     // TODO better
     // potential idea: use only 1 array
@@ -163,13 +175,13 @@ export class Node {
       visited.push(current)
 
       for(let edge of current.incoming) {
-        if(visited.indexOf(edge.source) === -1) {
-          toVisit.push(edge.source)
+        if(visited.indexOf(edge.getSource()) === -1) {
+          toVisit.push(edge.getSource())
         }
       }
       for(let edge of current.outgoing) {
-        if(visited.indexOf(edge.destination) === -1) {
-          toVisit.push(edge.destination)
+        if(visited.indexOf(edge.getDestination()) === -1) {
+          toVisit.push(edge.getDestination())
         }
       }
 
@@ -181,9 +193,12 @@ export class Node {
 
 }
 
+/** Displays {@link Node}s interconnected by {@link Edge}s. */
 export class Graph extends Model {
 
-  public root: Node | null = null
+  /** Nodes from which drawing begins. */
+  public roots: Node[] | Node | null = null
+  /** Border used when a node doesn't specify its own. */
   public defaultBorder: Border = new EllipseBorder()
 
 
@@ -192,9 +207,21 @@ export class Graph extends Model {
   }
 
   public draw(drawer: Drawer): void {
-    if(this.root === null) return
+    if(this.roots === null) return
 
-    const nodes = this.root.discoverLinkedNodes()
+    const nodes: Node[] = []
+    if(this.roots instanceof Array) {
+      for(let root of this.roots) {
+        for(let linked of root.discoverLinkedNodes()) {
+          nodes.push(linked)
+        }
+      }
+    } else if(this.roots instanceof Node) {
+      for(let linked of this.roots.discoverLinkedNodes()) {
+        nodes.push(linked)
+      }
+    }
+
     const sizes = new WeakMap()
 
     for(let node of nodes) {
@@ -210,19 +237,15 @@ export class Graph extends Model {
       const border = node.border || this.defaultBorder
       const borderBounds: Region = border.getBounds(textSize)
 
-      //DebugDraw.box(drawer, node.position, textSize)
-
-      // FIXME misalignment when boundary goes off-screen
       const corner = VectorUtil.add(node.position, borderBounds.origin)
       const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
         .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
-      //borderDrawer.fill('#0000ff44')
       border.draw(textSize, borderDrawer)
     }
 
     // Draw edges
     for(let node of nodes) {
-      for(let edge of node.outgoing) {
+      for(let edge of node.getOutgoingEdges()) {
         const other = edge.getDestination()
 
         let startPos = edge.getSource().position

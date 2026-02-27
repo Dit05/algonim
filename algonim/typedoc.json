@@ -4,5 +4,6 @@
   "excludePrivate": true,
   "out": "docs",
   "includeVersion": true,
-  "readme": "README.md"
+  "readme": "README.md",
+  "sort": "source-order"
 }
