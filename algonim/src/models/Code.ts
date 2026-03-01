@@ -29,11 +29,11 @@ export class Sign implements TextAtom {
   }
 
   public destroy() {
-    if(this.line === null) throw new TypeError('This sign has been destroyed.')
+    if(this.line === null) throw new TypeError("This sign has been destroyed.")
 
     const index = this.line.signs.indexOf(this)
     if(index === -1) {
-      if(CONFIG.CONSISTENCY_CHECKS) CONFIG.warnInconsistency('Non-destroyed Sign not in signs array of Line')
+      if(CONFIG.CONSISTENCY_CHECKS) CONFIG.warnInconsistency("Non-destroyed Sign not in signs array of Line.")
       return
     }
 
