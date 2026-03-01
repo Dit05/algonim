@@ -1,5 +1,6 @@
 import { Gif } from '@/gif/Gif'
 import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
+import { ByteVector } from './gif/ByteVector'
 
 
 /**
@@ -77,8 +78,7 @@ export class Algonim extends HTMLElement {
         hash = (hash + 7*img.data[i]) % 149
       }
       console.log(`GIF FRAME (${hash})`)
-      // TODO accept ImageData directly
-      gif.addFrame(img.data)
+      gif.addImage(img)
     }
 
     const seq = new Sequence(gifCanvas)

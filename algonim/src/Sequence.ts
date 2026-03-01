@@ -43,7 +43,7 @@ export class Sequence {
 
   private static layoutToPane(layout: Layout, depthLimit: number): Pane {
     if(depthLimit <= 0) {
-      throw new Error('Depth limit reached while scanning layout.')
+      throw new Error("Depth limit reached while scanning layout.")
     }
 
     if(layout instanceof Model) {
@@ -65,7 +65,7 @@ export class Sequence {
       pane.second = layout.right !== undefined && layout.right !== null ? Sequence.layoutToPane(layout.right, depthLimit - 1) : null
       return pane
     } else {
-      throw new TypeError('Invalid layout.')
+      throw new TypeError("Invalid layout.")
     }
   }
 
