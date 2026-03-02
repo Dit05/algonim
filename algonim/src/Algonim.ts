@@ -1,6 +1,7 @@
 import { Gif } from '@/gif/Gif'
+import { Image } from './gif/blocks/Image'
+import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
-import { ByteVector } from './gif/ByteVector'
 
 
 /**
@@ -11,7 +12,7 @@ export class Algonim extends HTMLElement {
   protected static observedAttributes = ["delay"]
 
   // Observed attributes
-  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. @see {@link keyframe} */
+  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. */
   delay: number = 1000
   //
 
@@ -68,7 +69,7 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public recordGif(func: SequenceFn): Promise<void> {
+  public recordGif(func: SequenceFn): Promise<Gif> {
     const gifCanvas = this.createCanvas()
     const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
@@ -78,16 +79,27 @@ export class Algonim extends HTMLElement {
         hash = (hash + 7*img.data[i]) % 149
       }
       console.log(`GIF FRAME (${hash})`)
-      gif.addImage(img)
+      gif.blocks.push(Image.fromCanvasImageData(img))
     }
 
     const seq = new Sequence(gifCanvas)
     seq.addImageDataConsumer(consumer)
-    return func(seq)
+    return func(seq).then(() => {
+      // HACK
+      downloadGif(gif)
+      return gif
+    })
   }
 
 }
 
+
+// HACK
+export function downloadGif(gif: Gif) {
+  const vec = new ByteVector(1024)
+  gif.createFile(vec)
+  window.open(URL.createObjectURL(new Blob(vec.finish())))
+}
 
 
 // Module setup

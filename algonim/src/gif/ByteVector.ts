@@ -1,5 +1,8 @@
 
 
+/**
+* Builds a sequence of bytes. Multi-byte values are stored little-endian.
+*/
 export class ByteVector {
 
   /** The largest writeable value is 8*8 = 64 bits, so we need at least that much buffer. */
@@ -51,17 +54,18 @@ export class ByteVector {
 
 
   public addUint8(value: number) { this.add((a, b) => this.view.setUint8(a, b), 1, value) }
-  public addUint16(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setUint16), 2, value) }
-  public addUint32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setUint32), 4, value) }
+  public addUint16(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setUint16.bind(this.view)), 2, value) }
+  public addUint32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setUint32.bind(this.view)), 4, value) }
 
   public addInt8(value: number) { this.add(this.view.setInt8, 1, value) }
-  public addInt16(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setInt16), 2, value) }
-  public addInt32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setInt32), 4, value) }
+  public addInt16(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setInt16.bind(this.view)), 2, value) }
+  public addInt32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setInt32.bind(this.view)), 4, value) }
 
-  public addFloat32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setFloat32), 4, value) }
-  public addFloat64(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setFloat64), 8, value) }
+  public addFloat32(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setFloat32.bind(this.view)), 4, value) }
+  public addFloat64(value: number) { this.add(ByteVector.makeLittleEndian(this.view.setFloat64.bind(this.view)), 8, value) }
 
-  public finish() {
+  /** Returns all added data as ArrayBuffer blocks, and makes this instance unusable. */
+  public finish(): ArrayBuffer[] {
     if(this.bufferOffset > 0) {
       this.flush()
     }
