@@ -1,6 +1,10 @@
 import { Gif } from '@/gif/Gif'
+import { ColorTable, ColorUtil } from './gif/ColorTable'
+import { Image } from './gif/blocks/Image'
+import { ByteVector } from '@/gif/ByteVector'
+import { BitVector } from '@/gif/BitVector'
 import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
-import { ByteVector } from './gif/ByteVector'
+import { compress } from './gif/VLCLZW'
 
 
 /**
@@ -11,7 +15,7 @@ export class Algonim extends HTMLElement {
   protected static observedAttributes = ["delay"]
 
   // Observed attributes
-  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. @see {@link keyframe} */
+  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. */
   delay: number = 1000
   //
 
@@ -68,9 +72,15 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public recordGif(func: SequenceFn): Promise<void> {
+  public async recordGif(func: SequenceFn): Promise<Gif> {
     const gifCanvas = this.createCanvas()
     const gif = new Gif(gifCanvas.width, gifCanvas.height)
+
+    const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
+    stupidColorTable.colors[0] = ColorUtil.rgba8(0, 0, 0)
+    stupidColorTable.colors[1] = ColorUtil.rgba8(255, 255, 255)
+
+    gif.globalColorTable = stupidColorTable
 
     const consumer: ImageDataConsumerFn = function(img: ImageData) {
       let hash = 0
@@ -78,17 +88,64 @@ export class Algonim extends HTMLElement {
         hash = (hash + 7*img.data[i]) % 149
       }
       console.log(`GIF FRAME (${hash})`)
-      gif.addImage(img)
+      gif.blocks.push(Image.fromCanvasImageData(img, stupidColorTable))
     }
 
     const seq = new Sequence(gifCanvas)
     seq.addImageDataConsumer(consumer)
-    return func(seq)
+    await func(seq)
+
+    // HACK
+    downloadGif(gif)
+    return gif
   }
 
 }
 
 
+// HACK
+export function downloadGif(gif: Gif) {
+  const vec = new ByteVector(1024)
+  gif.createFile(vec)
+  window.open(URL.createObjectURL(new Blob(vec.finish())))
+}
+
 
 // Module setup
 customElements.define('algonim-element', Algonim)
+
+// HACK
+function binary(byte: number): string {
+  let str = ''
+  for(let i = 0; i < 8; i++) {
+    str = ((byte & 1) > 0 ? '1' : '0') + str
+    byte >>= 1
+  }
+  return str
+}
+
+/*
+let msg = ''
+for(let byte of compress([0, 255, 0, 255], 8)) {
+  msg += binary(byte) + '\n'
+}
+console.log(msg)
+
+const fos = new BitVector(byte => console.log(binary(byte)))
+fos.add(0b11111, 5)
+fos.add(0, 5)
+fos.add(0b11111, 5)
+fos.flush()
+*/
+
+const data = "TOBEORNOTTOBEORTOBEORNOT"
+const array: number[] = []
+for(let i = 0; i < data.length; i++) {
+  array.push((data.codePointAt(i) ?? 0) - ('A'.codePointAt(0) ?? 0) + 1)
+}
+const gen = compress(array, 5)
+let msg = ''
+for(let byte of gen) {
+  msg += binary(byte) + '\n'
+}
+console.log(msg)

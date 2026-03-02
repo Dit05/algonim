@@ -5,14 +5,15 @@ import { Model } from '@/models/Model'
 import * as Models from '@/models'
 
 
-/** Describes a {@link Pane} hierarchy. @see {@link Algonim.setLayout} */
+/** Describes a {@link Pane} hierarchy. @see {@link Sequence.setLayout} */
 export type Layout = Model
   | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
   | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
-/** A function that plays an animation sequence. @see {@link Algonim.slideshow} */
+/** Plays an animation sequence. @see {@link Algonim!Algonim.slideshow} */
 export type SequenceFn = (seq: Sequence) => Promise<void>
 
+/** Can be subscribed to a sequence to receive rendered frames from it. @see {@link Sequence.addImageDataConsumer} */
 export type ImageDataConsumerFn = (img: ImageData) => void
 
 
