@@ -1,176 +1,112 @@
+import { ByteVector } from './ByteVector'
+import { ColorTable } from './ColorTable'
 
 
-interface Block {
+export interface Block {
+  emit(vec: ByteVector): void
+  /** Notice that this method returns any potential errors, rather than throwing them. */
+  isInvalidIn(gif: Gif): Error | null
 }
 
-class Color {
-
-  public static rgba8(red: number, green: number, blue: number, alpha: number = 255): number {
-    function clamp(x: number) {
-      if(x > 255) {
-        return 255
-      } else if(x >= 0) {
-        // Returning the input purposefully isn't in the else branch, since NaN would also compare as ">= 0 but < 255"
-        return x
-      } else {
-        return 0
-      }
-    }
-
-    return clamp(red)
-        | (clamp(green) << 8)
-        | (clamp(blue) << 16)
-        | (clamp(alpha) << 24)
-  }
-
-}
-
-class Image implements Block {
-
-  /** Width of this Image. */
-  public readonly width: number
-  /** Height of this Image. */
-  public readonly height: number
-
-  // Uint32Array's endianness is system-dependent!
-  private readonly data: Uint32Array
-
-
-  public constructor(width: number, height: number) {
-    this.width = width
-    this.height = height
-    this.data = new Uint32Array(width * height)
-  }
-
-
-  static isIterable<T>(obj: any): obj is Iterable<T> {
-    return (obj !== null) && (Symbol.iterator in obj) && (typeof(obj[Symbol.iterator]) === 'function')
-  }
-
-  /**
-  * Populates this image's pixels via a sequence of bytes.
-  *
-  * @param order Swizzling order of bytes. Letters that don't correspond to any channel cause that byte to be ignored. Valid channels are `R`/`r` for red, `G`/`g` for green, and `B`/`b` for blue.
-  */
-  public fillData(bytes: { [key: number]: number, length: number } | Iterable<number>, order: string = 'RGB_', endianness: 'big' | 'little' = 'big'): { filledPixels: number, fullyFilled: boolean } {
-    // If bytes is only indexable rather than Iterable, wrap it
-    if(!(Image.isIterable(bytes))) {
-      const narrowedBytes = bytes
-      bytes = function*() {
-        for(let i = 0; i < narrowedBytes.length; i++) {
-          yield narrowedBytes[i]
-        }
-      }()
-    }
-
-    function pushIntoChannel(channel: number, size: number, byte: number): number {
-      if(endianness == 'little') {
-        return channel + (byte << (8 * size))
-      } else {
-        return (channel << 8) + byte
-      }
-    }
-
-    function getFinalValue(channel: number, size: number): number {
-      // Uint32Array will round 0-0.999... to 0 and 255-255.999... to 255. If we multiplied by only 255, then 255's band would be only the single max value.
-      return (size > 0 ? channel / ((1 << (8 * size)) - 1) : 0) * 256
-    }
-
-    let arrayIndex = 0
-
-    let swizzleIndex = 0
-    let red: number = 0
-    let redSize: number = 0
-    let green: number = 0
-    let greenSize: number = 0
-    let blue: number = 0
-    let blueSize: number = 0
-
-    for(let byte of bytes) {
-      // Decide which channel to add it to
-      switch(order.charAt(swizzleIndex % order.length)) {
-        case 'R':
-        case 'r':
-          red = pushIntoChannel(red, redSize, byte)
-          redSize += 1
-          break
-
-        case 'G':
-        case 'g':
-          green = pushIntoChannel(green, greenSize, byte)
-          greenSize += 1
-          break
-
-        case 'B':
-        case 'b':
-          blue = pushIntoChannel(blue, blueSize, byte)
-          blueSize += 1
-          break
-      }
-
-      // Last value of pixel?
-      swizzleIndex += 1
-      if(swizzleIndex == order.length) {
-        this.data[arrayIndex++] = Color.rgba8(
-          getFinalValue(red, redSize),
-          getFinalValue(green, greenSize),
-          getFinalValue(blue, blueSize)
-        )
-
-        swizzleIndex = 0
-        red = 0
-        redSize = 0
-        green = 0
-        greenSize = 0
-        blue = 0
-        blueSize = 0
-      }
-
-      if(arrayIndex >= this.data.length) {
-        break
-      }
-    }
-
-    return {
-      filledPixels: arrayIndex,
-      fullyFilled: arrayIndex >= this.data.length
-    }
-  }
-}
 
 export class Gif {
   // https://www.w3.org/Graphics/GIF/spec-gif89a.txt
   // GIF is little endian
+
+  /** Maximum width/height. */
+  public static readonly MAX_DIMENSION = (256 * 256) - 1
 
   /** Width of the Logical Screen. */
   public readonly width: number
   /** Height of the Logical Screen. */
   public readonly height: number
 
-  private readonly blocks: Block[] = []
+  /**
+  * Non-mandatory blocks that will be added to the GIF stream.
+  *
+  * The header, logical screen descriptor, global color table (if provided), and trailer are always in the output.
+  */
+  public readonly blocks: Block[] = []
+
+  public globalColorTable: ColorTable | undefined = undefined
+  public backgroundColorIndex: number = 0
+  public pixelAspectRatio: number = 1.0
 
 
   public constructor(width: number, height: number) {
+    if(width < 1 || width > Gif.MAX_DIMENSION) throw new RangeError(`Logical screen width must be at least 1 and at most ${Gif.MAX_DIMENSION}`)
+    if(height < 1 || height > Gif.MAX_DIMENSION) throw new RangeError(`Logical screen height must be at least 1 and at most ${Gif.MAX_DIMENSION}`)
     this.width = width
     this.height = height
   }
 
 
-  public addImage(data: ImageData) {
-    if(data.width > this.width) throw new RangeError("Image data must not be more wide than the logical screen.")
-    if(data.height > this.height) throw new RangeError("Image data must not be more high than the logical screen.")
+  public static getBlockKind(label: number): 'graphic rendering' | 'control' | 'special purpose' | undefined {
+    if(label >= 0 && label <= 0x7f) {
+      // The Trailer block is in this range for some reason
+      if(label == 0x3b) {
+        return 'control'
+      }
+      return 'graphic rendering'
+    } else if(label >= 0x80 && label <= 0xf9) {
+      return 'control'
+    } else if(label >= 0xfa && label <= 0xff) {
+      return 'special purpose'
+    } else {
+      return undefined
+    }
+  }
 
-    const img = new Image(data.width, data.height)
-    if(data.colorSpace !== 'srgb') {
-      console.warn("ImageData color space isn't 'srgb', GIF colors will likely be incorrect.")
+  private static emitHeader(vec: ByteVector) {
+    const HEADER = "GIF89a"
+    for(let i = 0; i < HEADER.length; i++) {
+      vec.addUint8(HEADER.charCodeAt(i))
+    }
+  }
+
+  private emitLogicalScreenDescriptor(vec: ByteVector) {
+    vec.addUint16(this.width)
+    vec.addUint16(this.height)
+
+    let packedField: number = 0
+
+    packedField |= ((this.globalColorTable !== undefined) ? 1 : 0) << 7
+    let colorBits: number = 8 // Number of bits per primary color available to the original image, minus 1. (TODO should we care about this?)
+    packedField |= (colorBits - 1) << 4
+    packedField |= ((this.globalColorTable?.ordered ?? false) ? 1 : 0) << 3
+    packedField |= this.globalColorTable?.sizefield ?? 0
+    vec.addUint8(packedField)
+
+    vec.addUint8(this.globalColorTable !== null ? this.backgroundColorIndex : 0)
+
+    // TODO
+    let aspectRatio: number = 0
+    vec.addUint8(aspectRatio)
+
+    if(this.globalColorTable !== undefined) {
+      this.globalColorTable.emit(vec)
+    }
+  }
+
+  private static emitTrailer(vec: ByteVector) {
+    vec.addUint8(0x3b)
+  }
+
+
+  public createFile(vec: ByteVector) {
+    for(const block of this.blocks) {
+      const problem = block.isInvalidIn(this)
+      if(problem !== null) {
+        throw problem
+      }
     }
 
-    let result = img.fillData(data.data)
-    if(!result.fullyFilled) {
-      console.warn("Image was somehow not fully filled from ImageData.")
+    Gif.emitHeader(vec)
+    this.emitLogicalScreenDescriptor(vec)
+    for(const block of this.blocks) {
+      block.emit(vec)
     }
-
-    this.blocks.push(img)
+    Gif.emitTrailer(vec)
   }
 
 
