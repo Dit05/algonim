@@ -58,7 +58,7 @@ export class ColorTable {
     let bestMetric = Infinity
 
     for(let i = 0; i < this.colors.length; i++) {
-      const metric = distanceFn(this.colors[bestIndex], target)
+      const metric = distanceFn(this.colors[i], target)
       if(metric < bestMetric) {
         bestIndex = i
         bestMetric = metric
@@ -96,12 +96,11 @@ export type Color = number
 
 export class ColorUtil {
 
-  public static getRed(packed: Color): number { return packed & 0xff }
+  public static getRed(packed: Color): number { return (packed >> 16) & 0xff }
   public static getGreen(packed: Color): number { return (packed >> 8) & 0xff }
-  public static getBlue(packed: Color): number { return (packed >> 16) & 0xff }
-  public static getAlpha(packed: Color): number { return (packed >> 24) & 0xff }
+  public static getBlue(packed: Color): number { return (packed >> 0) & 0xff }
 
-  public static rgba8(red: number, green: number, blue: number, alpha: number = 255): Color {
+  public static rgb8(red: number, green: number, blue: number): Color {
     function clamp(x: number) {
       if(x > 255) {
         return 255
@@ -113,10 +112,9 @@ export class ColorUtil {
       }
     }
 
-    return clamp(red)
+    return clamp(blue)
         | (clamp(green) << 8)
-        | (clamp(blue) << 16)
-        | (clamp(alpha) << 24)
+        | (clamp(red) << 16)
   }
 
 }

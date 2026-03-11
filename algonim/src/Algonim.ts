@@ -2,6 +2,7 @@ import { Gif } from '@/gif/Gif'
 import { ColorTable, ColorUtil } from './gif/ColorTable'
 import { Image } from './gif/blocks/Image'
 import { ByteVector } from '@/gif/ByteVector'
+import * as TESTS from '@/gif/Tests'
 import { BitVector } from '@/gif/BitVector'
 import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
 import { compress } from './gif/VLCLZW'
@@ -77,8 +78,8 @@ export class Algonim extends HTMLElement {
     const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
     const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
-    stupidColorTable.colors[0] = ColorUtil.rgba8(0, 0, 0)
-    stupidColorTable.colors[1] = ColorUtil.rgba8(255, 255, 255)
+    stupidColorTable.colors[0] = ColorUtil.rgb8(0, 0, 0)
+    stupidColorTable.colors[1] = ColorUtil.rgb8(255, 255, 255)
 
     gif.globalColorTable = stupidColorTable
 
@@ -138,6 +139,7 @@ fos.add(0b11111, 5)
 fos.flush()
 */
 
+/*
 const data = "TOBEORNOTTOBEORTOBEORNOT"
 const array: number[] = []
 for(let i = 0; i < data.length; i++) {
@@ -149,3 +151,9 @@ for(let byte of gen) {
   msg += binary(byte) + '\n'
 }
 console.log(msg)
+*/
+
+export function test(w: number, h: number) {
+  const gif = TESTS.makeCheckerboard(0xc8c0da, 0x0000ff, w, h)
+  downloadGif(gif)
+}
