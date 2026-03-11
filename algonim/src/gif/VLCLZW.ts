@@ -131,6 +131,9 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
   const CODE_FIRST = CODE_CLEAR + 2
   const CODE_MAX = (1 << 12) - 1
 
+  let nextCode = CODE_FIRST
+  let codeSize = initialCodeSize + 1
+
   const output: number[] = []
   const bitVector = new BitVector((byte) => output.push(byte))
 
@@ -145,15 +148,28 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
     table[String.fromCodePoint(i)] = i
   }
 
-  bitVector.add(CODE_CLEAR, initialCodeSize + 1)
+  bitVector.add(CODE_CLEAR, codeSize)
 
-  let even = false
   for(const sym of data) {
-    bitVector.add(even ? 0 : 1, initialCodeSize + 1)
-    even = !even
+    bitVector.add(CODE_CLEAR, codeSize)
+    bitVector.add(sym, codeSize)
+    continue
+
+    nextCode += 1
+    if(nextCode > CODE_MAX) {
+      console.warn(`table reset (${codeSize})`)
+      bitVector.add(CODE_CLEAR, codeSize)
+      nextCode = CODE_FIRST
+      codeSize = initialCodeSize + 1
+    } else {
+      if(nextCode >= (1 << codeSize)) {
+        codeSize += 1
+      }
+    }
+    // TODO max
   }
 
-  bitVector.add(CODE_END, initialCodeSize + 1)
+  bitVector.add(CODE_END, codeSize)
   bitVector.flush()
 
   for(let i = 0; i < output.length; i++) {

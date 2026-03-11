@@ -100,10 +100,10 @@ export class Image implements Block {
 
     for(const byte of data) {
       buf[size] = byte
+      size += 1
       if(size >= 255) {
         finishSubBlock()
       }
-      size += 1
     }
 
     if(size > 0) finishSubBlock() // Remaining data
@@ -169,7 +169,7 @@ export class Image implements Block {
       // Last value of pixel?
       swizzleIndex += 1
       if(swizzleIndex == order.length) {
-        colors[arrayIndex++] = ColorUtil.rgba8(
+        colors[arrayIndex++] = ColorUtil.rgb8(
           getFinalValue(red, redSize),
           getFinalValue(green, greenSize),
           getFinalValue(blue, blueSize)
