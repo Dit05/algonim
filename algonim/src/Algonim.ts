@@ -154,6 +154,7 @@ console.log(msg)
 */
 
 export function test(w: number, h: number) {
-  const gif = TESTS.makeCheckerboard(0xc8c0da, 0x0000ff, w, h)
+  //const gif = TESTS.makeCheckerboard(0xc8c0da, 0x0000ff, w, h)
+  const gif = TESTS.makeGiflibExample()
   downloadGif(gif)
 }

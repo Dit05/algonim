@@ -11,12 +11,6 @@ interface ArrayLikeButWritable<T> extends ArrayLike<T> {
 
 class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
 
-  // TODO: benchmark
-  // - two arrays
-  // - one array with [(i << 1) + (flag | 0)]
-  // what if "not found" is undefined instead of -1?
-
-  // TODO allocate elements separately
   public readonly elements: TArray
   private readonly leftPtrs: Int32Array
   private readonly rightPtrs: Int32Array
@@ -46,7 +40,7 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
     return (array[index] = this.count)
   }*/
 
-  public insert(index: number, bits: number, size: number): number {
+  private insert(index: number, bits: number, size: number): number {
     while(size --> 0) {
       const array = ((bits & (1 << size)) > 0 ? this.rightPtrs : this.leftPtrs)
       if(array[index] < 0) {
@@ -118,7 +112,6 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
 
 }
 
-// FIXME i believe this is the last non-working part
 /**
 * Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link ./blocks/Image.Image.emitDataSubBlocks}.
 */
@@ -137,40 +130,57 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
   const output: number[] = []
   const bitVector = new BitVector((byte) => output.push(byte))
 
-  /*const tree = new CompactBinaryTree<number, Int32Array>(new Int32Array((CODE_MAX + 1) * initialCodeSize)) // TODO + 2?
-  tree.trim(0, -1) // Fill with -1 so that getTextRepresentation.
+  const tree = new CompactBinaryTree<number, Int32Array>(new Int32Array((CODE_MAX + 1) * initialCodeSize)) // TODO + 2?
+  //tree.trim(0, -1) // Fill with -1 so that getTextRepresentation.
   for(let i = 0; i < (1 << initialCodeSize); i++) {
-    tree.elements[tree.insert(0, i, initialCodeSize)] = i
-  }*/
-
-  const table: { [key: string]: number } = {}
-  for(let i = 0; i < CODE_CLEAR; i++) {
-    table[String.fromCodePoint(i)] = i
+    tree.elements[-(tree.traverseOrInsert(0, i, initialCodeSize) + 1)] = i
   }
 
   bitVector.add(CODE_CLEAR, codeSize)
 
-  for(const sym of data) {
-    bitVector.add(CODE_CLEAR, codeSize)
-    bitVector.add(sym, codeSize)
-    continue
+  let match = 0
 
-    nextCode += 1
-    if(nextCode > CODE_MAX) {
-      console.warn(`table reset (${codeSize})`)
-      bitVector.add(CODE_CLEAR, codeSize)
-      nextCode = CODE_FIRST
-      codeSize = initialCodeSize + 1
+  //const codestream = []
+
+  for(const sym of data) {
+    let nextMatch = tree.traverseOrInsert(match, sym, initialCodeSize)
+    if(nextMatch >= 0) {
+      // Found
+      match = nextMatch
+      //console.log(`matched ${sym}`)
     } else {
-      if(nextCode >= (1 << codeSize)) {
-        codeSize += 1
+      // Not found
+      //console.log(`not-matched ${sym}, adding ${nextCode}`)
+      tree.elements[-(nextMatch + 1)] = nextCode++
+      //console.log(tree.getTextRepresentation(x => x >= 0, initialCodeSize))
+
+      const code = tree.elements[match]
+      bitVector.add(code, codeSize)
+      //console.log(`emitting ${code} with size ${codeSize}`)
+      //codestream.push(code)
+      if(nextCode > (1 << codeSize)) {
+        // FIXME
+        if(codeSize + 1 > 12) {
+          bitVector.add(CODE_CLEAR, codeSize)
+          codeSize = 1
+          tree.trim(1 << initialCodeSize, -1)
+          //console.log(`code size resetting to ${codeSize}`)
+        } else {
+          codeSize += 1
+          //console.log(`code size increasing to ${codeSize}`)
+        }
       }
+
+      match = tree.traverseOrInsert(0, sym, initialCodeSize)
+      if(match < 0) throw new Error("This should never happen.")
     }
-    // TODO max
   }
 
+  bitVector.add(tree.elements[match], codeSize)
   bitVector.add(CODE_END, codeSize)
   bitVector.flush()
+
+  //console.log(codestream)
 
   for(let i = 0; i < output.length; i++) {
     yield output[i] 
