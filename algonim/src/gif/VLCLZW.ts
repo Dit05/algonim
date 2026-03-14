@@ -158,17 +158,15 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
       bitVector.add(code, codeSize)
       //console.log(`emitting ${code} with size ${codeSize}`)
       //codestream.push(code)
-      if(nextCode > (1 << codeSize)) {
-        // FIXME
-        if(codeSize + 1 > 12) {
-          bitVector.add(CODE_CLEAR, codeSize)
-          codeSize = 1
-          tree.trim(1 << initialCodeSize, -1)
-          //console.log(`code size resetting to ${codeSize}`)
-        } else {
-          codeSize += 1
-          //console.log(`code size increasing to ${codeSize}`)
-        }
+
+      if(nextCode > CODE_MAX) {
+        bitVector.add(CODE_CLEAR, codeSize)
+        codeSize = 1
+        tree.trim(1 << initialCodeSize, -1)
+        //console.log(`code size resetting to ${codeSize}`)
+      } else if(nextCode > (1 << codeSize)) {
+        codeSize += 1
+        //console.log(`code size increasing to ${codeSize}`)
       }
 
       match = tree.traverseOrInsert(0, sym, initialCodeSize)
