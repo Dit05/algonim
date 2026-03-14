@@ -71,8 +71,8 @@ export class Gif {
     let packedField: number = 0
 
     packedField |= ((this.globalColorTable !== undefined) ? 1 : 0) << 7
-    let colorBits: number = 8 // Number of bits per primary color available to the original image, minus 1. (TODO should we care about this?)
-    packedField |= (colorBits - 1) << 4
+    //let colorBits: number = 0 // Number of bits per primary color available to the original image, minus 1. (TODO should we care about this?)
+    //packedField |= (colorBits - 1) << 4
     packedField |= ((this.globalColorTable?.ordered ?? false) ? 1 : 0) << 3
     packedField |= this.globalColorTable?.sizefield ?? 0
     vec.addUint8(packedField)

@@ -60,7 +60,7 @@ export class Image implements Block {
     packedField |= 0 << 6 // Not interlaced.
     packedField |= ((this.isTableLocal && this.colorTable.ordered) ? 1 : 0) << 5
     // (2 bits are reserved)
-    packedField |= this.colorTable.sizefield ?? 0
+    packedField |= (this.isTableLocal ? this.colorTable.sizefield : 0)
     vec.addUint8(packedField)
 
     if(this.isTableLocal) {
