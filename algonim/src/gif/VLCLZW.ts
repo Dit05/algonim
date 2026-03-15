@@ -113,7 +113,7 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
 }
 
 /**
-* Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link ./blocks/Image.Image.emitDataSubBlocks}.
+* Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link gif/blocks/Image.Image.emitDataSubBlocks}.
 */
 export function* compress(data: Iterable<number>, initialCodeSize: number): Generator<number> {
   if(initialCodeSize < 2) throw new RangeError("Initial code size must be at least 2.")

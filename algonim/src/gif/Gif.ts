@@ -31,6 +31,8 @@ export class Gif {
   public globalColorTable: ColorTable | undefined = undefined
   public backgroundColorIndex: number = 0
   public pixelAspectRatio: number = 1.0
+  /** Number of bits per primary color available to the original image. This is entirely redundant and does not affect anything. Possibly it was included in the GIF specification as a joke. */
+  public colorBits: number = 0
 
 
   public constructor(width: number, height: number) {
@@ -71,8 +73,7 @@ export class Gif {
     let packedField: number = 0
 
     packedField |= ((this.globalColorTable !== undefined) ? 1 : 0) << 7
-    //let colorBits: number = 0 // Number of bits per primary color available to the original image, minus 1. (TODO should we care about this?)
-    //packedField |= (colorBits - 1) << 4
+    packedField |= Math.min(Math.max(0, this.colorBits - 1), 0b111) << 4
     packedField |= ((this.globalColorTable?.ordered ?? false) ? 1 : 0) << 3
     packedField |= this.globalColorTable?.sizefield ?? 0
     vec.addUint8(packedField)

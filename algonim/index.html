@@ -10,8 +10,7 @@
     <div style="margin: 0; padding: 0; width: 100%; height: 100lvh;">
       <algonim-element delay=1000></algonim-element><br>
       <div>
-        <button onclick="algonim.recordGif(animationFunc)">Click to make a GIF!</button>
-        <button onclick="window.Algonim.test(4, 4)">test 1234</button>
+        <button onclick="algonim.recordGif(animationFunc).then(gif => window.Algonim.downloadGif(gif))">Click to make a GIF!</button>
         <a href="./docs/index.html">docs</a>
       </div>
     </div>

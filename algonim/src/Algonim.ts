@@ -1,11 +1,9 @@
 import { Gif } from '@/gif/Gif'
 import { ColorTable, ColorUtil } from './gif/ColorTable'
 import { Image } from './gif/blocks/Image'
+import { GraphicControl } from './gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
-import * as TESTS from '@/gif/Tests'
-import { BitVector } from '@/gif/BitVector'
 import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
-import { compress } from './gif/VLCLZW'
 
 
 /**
@@ -84,11 +82,11 @@ export class Algonim extends HTMLElement {
     gif.globalColorTable = stupidColorTable
 
     const consumer: ImageDataConsumerFn = function(img: ImageData) {
-      let hash = 0
-      for(let i = 0; i < img.data.length; i++) {
-        hash = (hash + 7*img.data[i]) % 149
-      }
-      console.log(`GIF FRAME (${hash})`)
+      // FIXME even despite this, the browser stops playing the gif halfway through
+      const control = new GraphicControl()
+      // TODO obtain actual delay as passed to keyframe
+      control.delay = 100
+      gif.blocks.push(control)
       gif.blocks.push(Image.fromCanvasImageData(img, stupidColorTable))
     }
 
@@ -96,15 +94,12 @@ export class Algonim extends HTMLElement {
     seq.addImageDataConsumer(consumer)
     await func(seq)
 
-    // HACK
-    downloadGif(gif)
     return gif
   }
 
 }
 
 
-// HACK
 export function downloadGif(gif: Gif) {
   const vec = new ByteVector(1024)
   gif.createFile(vec)
@@ -114,47 +109,3 @@ export function downloadGif(gif: Gif) {
 
 // Module setup
 customElements.define('algonim-element', Algonim)
-
-// HACK
-function binary(byte: number): string {
-  let str = ''
-  for(let i = 0; i < 8; i++) {
-    str = ((byte & 1) > 0 ? '1' : '0') + str
-    byte >>= 1
-  }
-  return str
-}
-
-/*
-let msg = ''
-for(let byte of compress([0, 255, 0, 255], 8)) {
-  msg += binary(byte) + '\n'
-}
-console.log(msg)
-
-const fos = new BitVector(byte => console.log(binary(byte)))
-fos.add(0b11111, 5)
-fos.add(0, 5)
-fos.add(0b11111, 5)
-fos.flush()
-*/
-
-/*
-const data = "TOBEORNOTTOBEORTOBEORNOT"
-const array: number[] = []
-for(let i = 0; i < data.length; i++) {
-  array.push((data.codePointAt(i) ?? 0) - ('A'.codePointAt(0) ?? 0) + 1)
-}
-const gen = compress(array, 5)
-let msg = ''
-for(let byte of gen) {
-  msg += binary(byte) + '\n'
-}
-console.log(msg)
-*/
-
-export function test(w: number, h: number) {
-  //const gif = TESTS.makeCheckerboard(0xc8c0da, 0x0000ff, w, h)
-  const gif = TESTS.makeGiflibExample()
-  downloadGif(gif)
-}
