@@ -71,8 +71,53 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public async recordGif(func: SequenceFn): Promise<Gif> {
+  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined): Promise<Gif> {
+    const progress = {
+      setHidden(hidden: boolean) {
+        if(progressElement) progressElement.hidden = hidden
+      },
+      setMax(max: number) {
+        if(progressElement) progressElement.max = max
+      },
+      setValue(value: number | undefined) {
+        if(progressElement) {
+          if(value === undefined) {
+            progressElement.removeAttribute('value') // Make indeterminate
+          } else {
+            progressElement.value = value
+          }
+        }
+      },
+      animationFrame(): Promise<unknown> {
+        return new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+    }
+
+    // Capture frames
     const gifCanvas = this.createCanvas()
+    const seq = new Sequence(gifCanvas)
+    const frames: {
+      image: ImageData,
+      delay: number
+    }[] = []
+    seq.addImageDataConsumer(function(img: ImageData) {
+      frames.push({
+        image: img,
+        delay: 100 // TODO obtain actual delay as passed to keyframe
+      })
+    })
+
+    progress.setHidden(false)
+    progress.setValue(undefined) // To avoid having to solve the halting problem, set the progress bar to indeterminate
+    await progress.animationFrame()
+
+    await func(seq)
+
+    progress.setValue(0)
+    progress.setMax(frames.length)
+    await progress.animationFrame()
+
+    // Make the GIF
     const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
     const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
@@ -81,19 +126,24 @@ export class Algonim extends HTMLElement {
 
     gif.globalColorTable = stupidColorTable
 
-    const consumer: ImageDataConsumerFn = function(img: ImageData) {
+    for(let i = 0; i < frames.length; i++) {
+      const frame = frames[i]
+
       // FIXME even despite this, the browser stops playing the gif halfway through
       const control = new GraphicControl()
-      // TODO obtain actual delay as passed to keyframe
-      control.delay = 100
+      control.delay = frame.delay
       gif.blocks.push(control)
-      gif.blocks.push(Image.fromCanvasImageData(img, stupidColorTable))
+
+      gif.blocks.push(Image.fromCanvasImageData(frame.image, stupidColorTable))
+
+      progress.setValue(i + 1)
+      await progress.animationFrame()
     }
 
-    const seq = new Sequence(gifCanvas)
-    seq.addImageDataConsumer(consumer)
-    await func(seq)
+    // TODO track progress in GIF encodement
 
+    progress.setHidden(true)
+    await progress.animationFrame()
     return gif
   }
 
