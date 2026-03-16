@@ -2,7 +2,7 @@ import { ByteVector } from '../ByteVector'
 import { Block, Gif } from '../Gif'
 import { ColorUtil, ColorTable } from '../ColorTable'
 import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
-import { compress } from '../VLCLZW'
+import { compress, CompressionFn } from '../VLCLZW'
 
 
 export class Image implements Block {
@@ -20,6 +20,8 @@ export class Image implements Block {
   public readonly indices: Uint8ClampedArray
   public colorTable: ColorTable
   public isTableLocal: boolean = true
+
+  public compressionFn: CompressionFn = compress //(a, b) => stupidCompress(a, b, makeRandomizedStupidClearStategy(0.99))
 
 
   public constructor(width: number, height: number, colorTable: ColorTable) {
@@ -69,7 +71,7 @@ export class Image implements Block {
 
     const codeSize = Math.max(2, this.colorTable.sizefield + 1)
     vec.addUint8(codeSize)
-    Image.emitDataSubBlocks(compress(this.indices, codeSize), vec)
+    Gif.emitDataSubBlocks(this.compressionFn(this.indices, codeSize), vec)
   }
 
   public isInvalidIn(gif: Gif): RangeError | null {
@@ -82,33 +84,6 @@ export class Image implements Block {
     return null
   }
   //
-
-  /**
-  * Emits some data as GIF sub-blocks.
-  */
-  public static emitDataSubBlocks(data: Iterable<number>, vec: ByteVector) {
-    function finishSubBlock() {
-      vec.addUint8(size)
-      for(let i = 0; i < size; i++) {
-        vec.addUint8(buf[i])
-      }
-      size = 0
-    }
-
-    const buf = new Uint8ClampedArray(255)
-    let size = 0
-
-    for(const byte of data) {
-      buf[size] = byte
-      size += 1
-      if(size >= 255) {
-        finishSubBlock()
-      }
-    }
-
-    if(size > 0) finishSubBlock() // Remaining data
-    finishSubBlock() // Mandatory 0-size sub-block at the end
-  }
 
 
   /**

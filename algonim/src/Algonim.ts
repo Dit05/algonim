@@ -71,7 +71,7 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined): Promise<Gif> {
+  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, bufferSize: number = 1024): Promise<Blob> {
     const progress = {
       setHidden(hidden: boolean) {
         if(progressElement) progressElement.hidden = hidden
@@ -114,7 +114,7 @@ export class Algonim extends HTMLElement {
     await func(seq)
 
     progress.setValue(0)
-    progress.setMax(frames.length)
+    progress.setMax(1)
     await progress.animationFrame()
 
     // Make the GIF
@@ -129,31 +129,30 @@ export class Algonim extends HTMLElement {
     for(let i = 0; i < frames.length; i++) {
       const frame = frames[i]
 
-      // FIXME even despite this, the browser stops playing the gif halfway through
       const control = new GraphicControl()
       control.delay = frame.delay
       gif.blocks.push(control)
 
       gif.blocks.push(Image.fromCanvasImageData(frame.image, stupidColorTable))
 
-      progress.setValue(i + 1)
+      progress.setValue((i + 1) / frames.length * 0.5)
       await progress.animationFrame()
     }
 
-    // TODO track progress in GIF encodement
+    const vec = new ByteVector(bufferSize)
+    const steps = gif.createFileStaged()
+    for(let i = 0; i < steps.length; i++) {
+      steps[i](vec)
+      progress.setValue(0.5 + (i + 1) / steps.length * 0.5)
+      await progress.animationFrame()
+    }
 
     progress.setHidden(true)
     await progress.animationFrame()
-    return gif
+
+    return new Blob(vec.finish())
   }
 
-}
-
-
-export function downloadGif(gif: Gif) {
-  const vec = new ByteVector(1024)
-  gif.createFile(vec)
-  window.open(URL.createObjectURL(new Blob(vec.finish())))
 }
 
 

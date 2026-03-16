@@ -94,7 +94,15 @@ export class Gif {
   }
 
 
+  /** Encodes this GIF as binary data into the given ByteVector. */
   public createFile(vec: ByteVector) {
+    for(const step of this.createFileStaged()) {
+      step(vec)
+    }
+  }
+
+  /** Returns the steps that {@link createFile} would perform, so that you can do them at your own pace. */
+  public createFileStaged(): ((vec: ByteVector) => void)[] {
     for(const block of this.blocks) {
       const problem = block.isInvalidIn(this)
       if(problem !== null) {
@@ -102,12 +110,42 @@ export class Gif {
       }
     }
 
-    Gif.emitHeader(vec)
-    this.emitLogicalScreenDescriptor(vec)
+    const steps = []
+
+    steps.push((vec: ByteVector) => Gif.emitHeader(vec))
+    steps.push((vec: ByteVector) => this.emitLogicalScreenDescriptor(vec))
     for(const block of this.blocks) {
-      block.emit(vec)
+      steps.push((vec: ByteVector) => block.emit(vec))
     }
-    Gif.emitTrailer(vec)
+    steps.push((vec: ByteVector) => Gif.emitTrailer(vec))
+
+    return steps
+  }
+
+
+  /** Emits some data as GIF sub-blocks. */
+  public static emitDataSubBlocks(data: Iterable<number>, vec: ByteVector) {
+    function finishSubBlock() {
+      vec.addUint8(size)
+      for(let i = 0; i < size; i++) {
+        vec.addUint8(buf[i])
+      }
+      size = 0
+    }
+
+    const buf = new Uint8ClampedArray(255)
+    let size = 0
+
+    for(const byte of data) {
+      buf[size] = byte
+      size += 1
+      if(size >= 255) {
+        finishSubBlock()
+      }
+    }
+
+    if(size > 0) finishSubBlock() // Remaining data
+    finishSubBlock() // Mandatory 0-size sub-block at the end
   }
 
 

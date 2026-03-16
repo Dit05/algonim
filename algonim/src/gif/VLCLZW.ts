@@ -5,35 +5,31 @@ import { BitVector } from "./BitVector"
 */
 
 
-interface ArrayLikeButWritable<T> extends ArrayLike<T> {
-  [n: number]: T
-}
+class CompactBinaryTree<TElem> {
 
-class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
-
-  public readonly elements: TArray
+  public elements: { [key: number]: TElem }
   public readonly bitWidth: number
 
   private readonly leftPtrs: Int32Array
   private readonly rightPtrs: Int32Array
   private count: number = 0
-  public getCount(): number { return this.count }
 
 
-  public constructor(elements: TArray, bitWidth: number) {
-    this.elements = elements
+  public constructor(size: number, bitWidth: number) {
+    this.elements = {}
     this.bitWidth = bitWidth
 
-    this.leftPtrs = new Int32Array(elements.length)
-    this.rightPtrs = new Int32Array(elements.length)
+    this.leftPtrs = new Int32Array(size * bitWidth)
+    this.rightPtrs = new Int32Array(size * bitWidth)
     this.leftPtrs.fill(-1)
     this.rightPtrs.fill(-1)
   }
 
 
-  private insert(index: number, bits: number, size: number): number {
+  private insert(index: number, path: number): number {
+    let size = this.bitWidth
     while(size --> 0) {
-      const array = ((bits & (1 << size)) > 0 ? this.rightPtrs : this.leftPtrs)
+      const array = ((path & (1 << size)) > 0 ? this.rightPtrs : this.leftPtrs)
       if(array[index] < 0) {
         this.count += 1
         index = (array[index] = this.count)
@@ -45,9 +41,9 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
   }
 
   /** Returns a non-negative value if traversal was successful, or `-1 - index` if insertion was needed. */
-  public traverseOrInsert(index: number, bits: number, size: number): number {
+  public traverseOrInsert(index: number, path: number): number {
     const countWas = this.count
-    const result = this.insert(index, bits, size)
+    const result = this.insert(index, path)
 
     if(countWas != this.count) {
       return -1 - result
@@ -56,11 +52,15 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
     }
   }
 
-  public trim(keepCount: number, clearValue: TElem) {
-    this.leftPtrs.fill(-1, keepCount)
-    this.rightPtrs.fill(-1, keepCount)
-    while(keepCount < this.elements.length) {
-      this.elements[keepCount++] = clearValue
+  public clear() {
+    this.leftPtrs.fill(-1)
+    this.rightPtrs.fill(-1)
+    this.elements = {}
+  }
+
+  public addRoots(elementFn: (i: number) => TElem) {
+    for(let i = 0; i < this.bitWidth; i++) {
+      this.elements[-(this.traverseOrInsert(0, i) + 1)] = elementFn(i)
     }
   }
 
@@ -103,12 +103,66 @@ class CompactBinaryTree<TElem, TArray extends ArrayLikeButWritable<TElem>> {
 
 }
 
-/**
-* Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link gif/blocks/Image.Image.emitDataSubBlocks}.
-*/
-export function* compress(data: Iterable<number>, initialCodeSize: number): Generator<number> {
-  if(initialCodeSize < 2) throw new RangeError("Initial code size must be at least 2.")
+
+/** Throws an error for invalid code sizes. */
+export function validateInitialCodeSize(initialCodeSize: number) {
+  if(!isFinite(initialCodeSize) || isNaN(initialCodeSize)) throw new RangeError("Initial code size must be finite and non-NaN.")
+  if(initialCodeSize < 2) throw new RangeError("Initial code size must be at least 2, even for 2-color images.")
   if(initialCodeSize > 8) throw new RangeError("Initial code size must be at most 8.")
+}
+
+/** Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link gif/blocks/Image.Image.emitDataSubBlocks}. */
+export type CompressionFn = (data: Iterable<number>, initialCodeSize: number) => Generator<number>
+
+
+/**
+* Creates an useful implementation of {@link stupidCompress}'s `clearStrategy`, that starts out with one clear, and every time the chance `p` passes, it's increased by one.
+* @param p Chance to keep increasing amount of clears. Be careful to always pass numbers less than 1, otherwise the resulting function won't halt.
+*/
+export function makeRandomizedStupidClearStategy(p: number): () => number {
+  return function() {
+    let n = 1
+    while(Math.random() < p) n++
+    return n
+  }
+}
+
+/** Stupid implementation of {@link CompressionFn} that outputs each input symbol verbatim, separated by a clear code. */
+export function* stupidCompress(data: Iterable<number>, initialCodeSize: number, clearStrategy: () => number = () => 1): Generator<number> {
+  validateInitialCodeSize(initialCodeSize)
+
+  const CODE_CLEAR = (1 << initialCodeSize)
+  const CODE_END = CODE_CLEAR + 1
+
+  const output: number[] = []
+  const bitVector = new BitVector((byte) => output.push(byte))
+
+  bitVector.add(CODE_CLEAR, initialCodeSize + 1)
+  for(const sym of data) {
+    bitVector.add(sym, initialCodeSize + 1)
+
+    let clears = Math.max(1, clearStrategy())
+    while(clears --> 0) {
+      bitVector.add(CODE_CLEAR, initialCodeSize + 1)
+    }
+
+    for(let i = 0; i < output.length; i++) {
+      yield output[i] 
+    }
+    output.length = 0
+  }
+
+  bitVector.add(CODE_END, initialCodeSize + 1)
+
+  for(let i = 0; i < output.length; i++) {
+    yield output[i] 
+  }
+  output.length = 0
+}
+
+/** Canonical, decent implementation of {@link CompressionFn}. */
+export function* compress(data: Iterable<number>, initialCodeSize: number): Generator<number> {
+  validateInitialCodeSize(initialCodeSize)
 
   const CODE_CLEAR = (1 << initialCodeSize)
   const CODE_END = CODE_CLEAR + 1
@@ -121,11 +175,8 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
   const output: number[] = []
   const bitVector = new BitVector((byte) => output.push(byte))
 
-  const tree = new CompactBinaryTree<number, Int32Array>(new Int32Array((CODE_MAX + 1) * initialCodeSize), initialCodeSize) // TODO + 2?
-  tree.trim(0, -1)
-  for(let i = 0; i < (1 << initialCodeSize); i++) {
-    tree.elements[-(tree.traverseOrInsert(0, i, initialCodeSize) + 1)] = i
-  }
+  const tree = new CompactBinaryTree<number>(CODE_MAX, initialCodeSize)
+  tree.addRoots(i => i)
 
   bitVector.add(CODE_CLEAR, codeSize)
 
@@ -133,7 +184,7 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
   for(const sym of data) {
     if(sym < 0 || sym >= (1 << initialCodeSize)) throw new RangeError(`'${sym}' falls outside the representable range of [${0}..${(1 << initialCodeSize) - 1}].`)
 
-    let nextMatch = tree.traverseOrInsert(match, sym, initialCodeSize)
+    let nextMatch = tree.traverseOrInsert(match, sym)
     if(nextMatch >= 0) {
       // Found
       match = nextMatch
@@ -145,14 +196,17 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
       bitVector.add(code, codeSize)
 
       if(nextCode > CODE_MAX) {
+        // Table reset needed
         bitVector.add(CODE_CLEAR, codeSize)
-        codeSize = 1
-        tree.trim(1 << initialCodeSize, -1)
+        nextCode = CODE_FIRST
+        codeSize = initialCodeSize + 1
+        tree.clear()
+        tree.addRoots(i => i)
       } else if(nextCode > (1 << codeSize)) {
         codeSize += 1
       }
 
-      match = tree.traverseOrInsert(0, sym, initialCodeSize)
+      match = tree.traverseOrInsert(0, sym)
       if(match < 0) throw new Error("This should never happen.")
     }
 
@@ -170,5 +224,4 @@ export function* compress(data: Iterable<number>, initialCodeSize: number): Gene
     yield output[i] 
   }
   output.length = 0
-
 }

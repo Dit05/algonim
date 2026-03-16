@@ -5,12 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Algonim</title>
     <script src="dist/Algonim.js"></script>
+    <script>
+      function downloadBlob(blob) {
+        window.open(URL.createObjectURL(blob))
+      }
+    </script>
   </head>
   <body>
     <div style="margin: 0; padding: 0; width: 100%; height: 100lvh;">
       <algonim-element delay=1000></algonim-element><br>
       <div>
-        <button onclick="algonim.recordGif(animationFunc, document.getElementById('gif-progress')).then(gif => window.Algonim.downloadGif(gif))">Click to make a GIF!</button>
+        <button onclick="algonim.recordGif(animationFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
         <progress id="gif-progress" hidden="true"></progress>
         <a href="./docs/index.html">docs</a>
       </div>
