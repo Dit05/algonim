@@ -1,9 +1,9 @@
 import { Gif } from '@/gif/Gif'
-import { ColorTable, ColorUtil } from './gif/ColorTable'
+import { ColorTable } from './gif/ColorTable'
 import { Image } from './gif/blocks/Image'
 import { GraphicControl } from './gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
-import { SequenceFn, Sequence, ImageDataConsumerFn } from '@/Sequence'
+import { SequenceFn, Sequence} from '@/Sequence'
 
 
 /**
@@ -93,64 +93,71 @@ export class Algonim extends HTMLElement {
       }
     }
 
-    // Capture frames
-    const gifCanvas = this.createCanvas()
-    const seq = new Sequence(gifCanvas)
-    const frames: {
-      image: ImageData,
-      delay: number
-    }[] = []
-    seq.addImageDataConsumer(function(img: ImageData) {
-      frames.push({
-        image: img,
-        delay: 100 // TODO obtain actual delay as passed to keyframe
+    try {
+      // Capture frames
+      const gifCanvas = this.createCanvas()
+      const seq = new Sequence(gifCanvas)
+      const frames: {
+        image: ImageData,
+        delay: number
+      }[] = []
+      seq.addImageDataConsumer(function(img: ImageData) {
+        frames.push({
+          image: img,
+          delay: 100 // TODO obtain actual delay as passed to keyframe
+        })
       })
-    })
 
-    progress.setHidden(false)
-    progress.setValue(undefined) // To avoid having to solve the halting problem, set the progress bar to indeterminate
-    await progress.animationFrame()
+      progress.setHidden(false)
+      progress.setValue(undefined) // To avoid having to solve the halting problem, set the progress bar to indeterminate
+      await progress.animationFrame()
 
-    await func(seq)
+      await func(seq)
 
-    progress.setValue(0)
-    progress.setMax(1)
-    await progress.animationFrame()
+      progress.setValue(0)
+      progress.setMax(1)
+      await progress.animationFrame()
 
-    // Make the GIF
-    const gif = new Gif(gifCanvas.width, gifCanvas.height)
+      // Make the GIF
+      const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
-    const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
-    stupidColorTable.colors[0] = ColorUtil.rgb8(0, 0, 0)
-    stupidColorTable.colors[1] = ColorUtil.rgb8(255, 255, 255)
+      /*const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
+      stupidColorTable.colors[0] = ColorUtil.rgb8(0, 0, 0)
+      stupidColorTable.colors[1] = ColorUtil.rgb8(255, 255, 255)*/
+      //gif.globalColorTable = ColorTable.createEvenlyDistributed(2)
+      gif.globalColorTable = undefined
+      // FIXME color matching takes forever with a large color table
 
-    gif.globalColorTable = stupidColorTable
+      for(let i = 0; i < frames.length; i++) {
+        const frame = frames[i]
 
-    for(let i = 0; i < frames.length; i++) {
-      const frame = frames[i]
+        const control = new GraphicControl()
+        control.delay = frame.delay
+        gif.blocks.push(control)
 
-      const control = new GraphicControl()
-      control.delay = frame.delay
-      gif.blocks.push(control)
+        const localTable = ColorTable.createQuantized(3, frame.image)
+        const image = Image.fromCanvasImageData(frame.image, localTable)
+        image.tableIsLocal = true
+        //image.compressionFn = stupidCompress // HACK
+        gif.blocks.push(image)
 
-      gif.blocks.push(Image.fromCanvasImageData(frame.image, stupidColorTable))
+        progress.setValue((i + 1) / frames.length * 0.5)
+        await progress.animationFrame()
+      }
 
-      progress.setValue((i + 1) / frames.length * 0.5)
+      const vec = new ByteVector(bufferSize)
+      const steps = gif.createFileStaged()
+      for(let i = 0; i < steps.length; i++) {
+        steps[i](vec)
+        progress.setValue(0.5 + (i + 1) / steps.length * 0.5)
+        await progress.animationFrame()
+      }
+
+      return new Blob(vec.finish())
+    } finally {
+      progress.setHidden(true)
       await progress.animationFrame()
     }
-
-    const vec = new ByteVector(bufferSize)
-    const steps = gif.createFileStaged()
-    for(let i = 0; i < steps.length; i++) {
-      steps[i](vec)
-      progress.setValue(0.5 + (i + 1) / steps.length * 0.5)
-      await progress.animationFrame()
-    }
-
-    progress.setHidden(true)
-    await progress.animationFrame()
-
-    return new Blob(vec.finish())
   }
 
 }

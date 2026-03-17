@@ -1,8 +1,9 @@
 import { ByteVector } from '../ByteVector'
 import { Block, Gif } from '../Gif'
-import { ColorUtil, ColorTable } from '../ColorTable'
-import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
+import { ColorTable } from '../ColorTable'
+import { ColorUtil } from '../Color'
 import { compress, CompressionFn } from '../VLCLZW'
+import * as CONFIG from '@/config'
 
 
 export class Image implements Block {
@@ -17,9 +18,10 @@ export class Image implements Block {
   /** Vertical offset relative to the top left corner of the logical screen. */
   public offsetY: number = 0
 
+  /** Indices into the color table, from left to right, top to bottom. */
   public readonly indices: Uint8ClampedArray
   public colorTable: ColorTable
-  public isTableLocal: boolean = true
+  public tableIsLocal: boolean = true
 
   public compressionFn: CompressionFn = compress //(a, b) => stupidCompress(a, b, makeRandomizedStupidClearStategy(0.99))
 
@@ -34,18 +36,57 @@ export class Image implements Block {
   }
 
 
-  public static fromCanvasImageData(data: ImageData, colorTable: ColorTable | undefined): Image {
-    if(data.colorSpace !== undefined && data.colorSpace !== 'srgb') {
-      console.warn(`ImageData color space isn't 'srgb' (it's '${data.colorSpace}'), colors will likely be incorrect.`)
+  public static fromCanvasImageData(imageData: ImageData, colorTable: ColorTable | undefined): Image {
+    if(imageData.colorSpace !== undefined && imageData.colorSpace !== 'srgb') {
+      console.warn(`ImageData color space isn't 'srgb' (it's '${imageData.colorSpace}'), colors will likely be incorrect.`)
     }
 
-    const result = Image.bytesToColorArray(data.width * data.height, data.data, 'RGB_', 'big')
-    if(!result.fullyFilled) {
-      console.warn("Image was somehow not fully filled when being created from canvas ImageData.")
-    }
-
-    return Image.fromColors(data.width, data.height, result.colors, colorTable)
+    return Image.fromColors(imageData.width, imageData.height, ColorUtil.imageDataToColors(imageData), colorTable)
   }
+
+  /**
+  * Creates an image from a sequence of colors.
+  *
+  * @param colors Obviously the length of this array must be `width * height` to be able to fill out the entire image.
+  * @param colorTable Color table to use. If `undefined`, one will be generated from the provided color data and stored as the result image's local color table.
+  */
+  public static fromColors(width: number, height: number, colors: Uint32Array, colorTable: ColorTable | undefined = undefined): Image {
+    if(colors.length !== width * height) throw new RangeError("Size of colors must be width * height.")
+
+    const hadColorTable = colorTable !== undefined
+    if(colorTable === undefined) {
+      colorTable = ColorTable.createQuantized(ColorTable.MAX_SIZEFIELD, colors)
+    }
+
+    const image = new Image(width, height, colorTable)
+    image.tableIsLocal = !hadColorTable
+    for(let i = 0; i < width * height; i++) {
+      image.indices[i] = colorTable.getClosestColorIndex(colors[i])
+    }
+
+    return image
+  }
+
+
+  /** Creates an image that uses every color in the given color table once. */
+  public static makePalette(colorTable: ColorTable): Image {
+    const size = ColorTable.sizefieldToSize(colorTable.sizefield)
+    const width = ColorTable.sizefieldToSize(colorTable.sizefield >> 1)
+    // Genuis!
+    const height = ((colorTable.sizefield & 0b1) == 0) ? width >> 1 : width
+
+    const img = new Image(width, height, colorTable)
+    if(CONFIG.CONSISTENCY_CHECKS) {
+      if(img.indices.length != size) CONFIG.warnInconsistency(`Image pixel count should be ${size}, but it's ${img.indices.length}`)
+    }
+
+    for(let i = 0; i < img.indices.length; i++) {
+      img.indices[i] = i
+    }
+
+    return img
+  }
+
 
 
   // Block
@@ -58,14 +99,14 @@ export class Image implements Block {
     vec.addUint16(this.height)
 
     let packedField = 0
-    packedField |= (this.isTableLocal ? 1 : 0) << 7
+    packedField |= (this.tableIsLocal ? 1 : 0) << 7
     packedField |= 0 << 6 // Not interlaced.
-    packedField |= ((this.isTableLocal && this.colorTable.ordered) ? 1 : 0) << 5
+    packedField |= ((this.tableIsLocal && this.colorTable.ordered) ? 1 : 0) << 5
     // (2 bits are reserved)
-    packedField |= (this.isTableLocal ? this.colorTable.sizefield : 0)
+    packedField |= (this.tableIsLocal ? this.colorTable.sizefield : 0)
     vec.addUint8(packedField)
 
-    if(this.isTableLocal) {
+    if(this.tableIsLocal) {
       this.colorTable.emit(vec)
     }
 
@@ -84,114 +125,5 @@ export class Image implements Block {
     return null
   }
   //
-
-
-  /**
-  * Interprets an array of bytes into colors.
-  *
-  * @param order Swizzling order of bytes. Letters that don't correspond to any channel cause that byte to be ignored. Valid channels are `R`/`r` for red, `G`/`g` for green, and `B`/`b` for blue.
-  * @param endianness In big-endian mode, the first byte is the most significant, while in little-endian mode, it's the least significant.
-  */
-  public static bytesToColorArray(length: number, bytes: CouldBeIterable<number>, order: string = 'RGB_', endianness: 'big' | 'little' = 'big'): { colors: Uint32Array, filledPixels: number, fullyFilled: boolean } {
-    bytes = makeIterable(bytes)
-    const colors = new Uint32Array(length)
-
-    function pushIntoChannel(channel: number, size: number, byte: number): number {
-      if(endianness == 'little') {
-        return channel + (byte << (8 * size))
-      } else {
-        return (channel << 8) + byte
-      }
-    }
-
-    function getFinalValue(channel: number, size: number): number {
-      // Uint32Array will round 0-0.999... to 0 and 255-255.999... to 255. If we multiplied by only 255, then 255's band would be only the single max value.
-      return (size > 0 ? channel / ((1 << (8 * size)) - 1) : 0) * 256
-    }
-
-    let arrayIndex = 0
-
-    let swizzleIndex = 0
-    let red: number = 0
-    let redSize: number = 0
-    let green: number = 0
-    let greenSize: number = 0
-    let blue: number = 0
-    let blueSize: number = 0
-
-    for(let byte of bytes) {
-      // Decide which channel to add it to
-      switch(order.charAt(swizzleIndex % order.length)) {
-        case 'R':
-        case 'r':
-          red = pushIntoChannel(red, redSize, byte)
-          redSize += 1
-          break
-
-        case 'G':
-        case 'g':
-          green = pushIntoChannel(green, greenSize, byte)
-          greenSize += 1
-          break
-
-        case 'B':
-        case 'b':
-          blue = pushIntoChannel(blue, blueSize, byte)
-          blueSize += 1
-          break
-      }
-
-      // Last value of pixel?
-      swizzleIndex += 1
-      if(swizzleIndex == order.length) {
-        colors[arrayIndex++] = ColorUtil.rgb8(
-          getFinalValue(red, redSize),
-          getFinalValue(green, greenSize),
-          getFinalValue(blue, blueSize)
-        )
-
-        swizzleIndex = 0
-        red = 0
-        redSize = 0
-        green = 0
-        greenSize = 0
-        blue = 0
-        blueSize = 0
-      }
-
-      if(arrayIndex >= colors.length) {
-        break
-      }
-    }
-
-    return {
-      colors,
-      filledPixels: arrayIndex,
-      fullyFilled: arrayIndex >= colors.length
-    }
-  }
-
-  /**
-  * Creates an image from a sequence of colors.
-  *
-  * @param colors Obviously the length of this array must be `width * height` to be able to fill out the entire image.
-  * @param colorTable Color table to use. If `undefined`, one will be generated from the provided color data and stored as the result image's local color table.
-  */
-  public static fromColors(width: number, height: number, colors: Uint32Array, colorTable: ColorTable | undefined = undefined): Image {
-    if(colors.length !== width * height) throw new RangeError("Size of colors must be width * height.")
-
-    const hadColorTable = colorTable !== undefined
-    if(colorTable === undefined) {
-      colorTable = ColorTable.createQuantized(ColorTable.MAX_SIZEFIELD, colors)
-    }
-
-    const image = new Image(width, height, colorTable)
-    image.isTableLocal = !hadColorTable
-    for(let i = 0; i < width * height; i++) {
-      image.indices[i] = colorTable.getClosestColorIndex(colors[i])
-    }
-
-    return image
-  }
 
 }

@@ -1,5 +1,7 @@
 import { ByteVector } from './ByteVector'
-import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
+import { CouldBeIterable } from '@/util/TypeAdapters'
+import { Color, ColorUtil } from './Color'
+import { randomReduce } from './ColorReducer'
 
 
 export type LossArguments = {
@@ -13,12 +15,14 @@ export type DistanceFn = (from: Color, to: Color) => number
 
 export class ColorTable {
 
-  // TODO docs
   public static readonly MIN_SIZEFIELD = 0
   public static readonly MAX_SIZEFIELD = 0b111
 
+  /** Represents valid table sizes. @see {@link sizefieldToSize} */
   public readonly sizefield: number
+  /** Colors in the table. @see {@link color} */
   public readonly colors: Uint32Array
+  /** Whether colors are sorted in order of decreasing importance. */
   public ordered: boolean = false
 
 
@@ -27,12 +31,61 @@ export class ColorTable {
     this.colors = new Uint32Array(ColorTable.sizefieldToSize(sizefield))
   }
 
-  public static createQuantized(sizefield: number, colors: CouldBeIterable<Color>): ColorTable {
-    // TODO
-    throw new TypeError("Not implemented.")
+  public static createQuantized(sizefield: number, colors: CouldBeIterable<Color> | ImageData): ColorTable {
+    const table = new ColorTable(sizefield)
+
+    // Type narrowing my beloved
+    if(colors instanceof ImageData) {
+      colors = ColorUtil.imageDataToColors(colors)
+    }
+
+    // TODO swappable reducer (make it a class? => Strategy Pattern)
+    const reduced: ArrayLike<Color> = randomReduce(ColorTable.sizefieldToSize(sizefield), colors)
+    for(let i = 0; i < table.colors.length; i++) {
+      table.colors[i] = reduced[i]
+    }
+
+    return table
+  }
+
+  /** Creates a color table filled with colors ranging from black to white. */
+  public static createGreyscale(sizefield: number): ColorTable {
+    const table = new ColorTable(sizefield)
+    for(let i = 0; i < table.colors.length; i++) {
+      const fac = i / (table.colors.length - 1)
+      table.colors[i] = ColorUtil.rgb(fac, fac, fac)
+    }
+    return table
+  }
+
+  /** Creates a color table filled with colors sampled along a cubic lattice from the RGB cube. Note that this implies a cubic number of colors, so the table won't be completely filled. */
+  public static createEvenlyDistributed(sizefield: number): ColorTable {
+    if(sizefield < 2) {
+      return ColorTable.createGreyscale(sizefield)
+    }
+
+    const table = new ColorTable(sizefield)
+
+    let edgeLength = 1
+    while((edgeLength * edgeLength * edgeLength) <= table.colors.length) {
+      edgeLength += 1
+    }
+    edgeLength -= 1
+
+    for(let b = 0; b < edgeLength; b++) {
+      for(let g = 0; g < edgeLength; g++) {
+        for(let r = 0; r < edgeLength; r++) {
+          let index = (b * edgeLength * edgeLength) + (g * edgeLength) + r
+          table.colors[index] = ColorUtil.rgb(r / (edgeLength - 1), g / (edgeLength - 1), b / (edgeLength - 1))
+        }
+      }
+    }
+
+    return table
   }
 
 
+  /** Converts a valid sizefield to an actual table size. */
   public static sizefieldToSize(sizefield: number) {
     if(sizefield < ColorTable.MIN_SIZEFIELD || sizefield > ColorTable.MAX_SIZEFIELD) throw new RangeError("sizefield must be between MIN_SIZEFIELD and MAX_SIZEFIELD.")
     return 1 << (sizefield + 1)
@@ -53,6 +106,7 @@ export class ColorTable {
   }
 
 
+  /** Gets the index of the color that has the lowest distance to the target. */
   public getClosestColorIndex(target: Color, distanceFn: DistanceFn = ColorTable.defaultDistanceFn): number {
     let bestIndex = 0
     let bestMetric = Infinity
@@ -68,15 +122,18 @@ export class ColorTable {
     return bestIndex
   }
 
+  /** Default implementation of {@link LossFn}. Multiplies the distance by fromPopulation. */
   public static defaultLossFn(args: LossArguments, distanceFn: DistanceFn = ColorTable.defaultDistanceFn): number {
     return distanceFn(args.fromColor, args.toColor) * args.fromPopulation
   }
 
+  /** Default implementation of {@link DistanceFn}. Calculates the sum of squared error per component. */
   public static defaultDistanceFn(from: Color, to: Color): number {
+    function square(x: number) { return x*x }
     let difference = 0
-    difference += Math.abs(ColorUtil.getRed(to) - ColorUtil.getRed(from))
-    difference += Math.abs(ColorUtil.getGreen(to) - ColorUtil.getGreen(from))
-    difference += Math.abs(ColorUtil.getBlue(to) - ColorUtil.getBlue(from))
+    difference += square(ColorUtil.getRed(to) - ColorUtil.getRed(from))
+    difference += square(ColorUtil.getGreen(to) - ColorUtil.getGreen(from))
+    difference += square(ColorUtil.getBlue(to) - ColorUtil.getBlue(from))
     return difference
   }
 
@@ -92,29 +149,3 @@ export class ColorTable {
 }
 
 
-export type Color = number
-
-export class ColorUtil {
-
-  public static getRed(packed: Color): number { return (packed >> 16) & 0xff }
-  public static getGreen(packed: Color): number { return (packed >> 8) & 0xff }
-  public static getBlue(packed: Color): number { return (packed >> 0) & 0xff }
-
-  public static rgb8(red: number, green: number, blue: number): Color {
-    function clamp(x: number) {
-      if(x > 255) {
-        return 255
-      } else if(x >= 0) {
-        // Returning the input purposefully isn't in the else branch, since NaN would also compare as ">= 0 but < 255"
-        return x
-      } else {
-        return 0
-      }
-    }
-
-    return clamp(blue)
-        | (clamp(green) << 8)
-        | (clamp(red) << 16)
-  }
-
-}

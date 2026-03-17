@@ -34,6 +34,7 @@ export class Sequence {
     // Register built-in models
     this.registerModel('code', () => new Models.Code())
     this.registerModel('graph', () => new Models.Graph())
+    this.registerModel('rainbow', () => new Models.Rainbow())
   }
 
 

@@ -15,7 +15,7 @@
     <div style="margin: 0; padding: 0; width: 100%; height: 100lvh;">
       <algonim-element delay=1000></algonim-element><br>
       <div>
-        <button onclick="algonim.recordGif(animationFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
+        <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
         <progress id="gif-progress" hidden="true"></progress>
         <a href="./docs/index.html">docs</a>
       </div>
@@ -111,7 +111,15 @@
         await seq.keyframe()
       }
 
-      algonim.slideshow(animationFunc)
+      const rainbowFunc = async function(seq) {
+        const rainbow = seq.createModel('rainbow')
+        rainbow.step = { x: 4, y: 4 }
+        seq.setLayout(rainbow)
+        await seq.keyframe()
+      }
+
+      const chosenFunc = rainbowFunc
+      algonim.slideshow(chosenFunc)
     </script>
   </body>
 </html>

@@ -242,34 +242,46 @@ export class Drawer {
   }
 
 
-  /** Draws an ellipse. @see [CanvasRenderingContext2D.ellipse](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse) */
-  public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
+  private drawPath(pathFn: (ctx: CanvasRenderingContext2D) => void, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null) {
     this.doClipped(() => {
-
-      const effectiveExtras: EllipseExtras = { ...{
-          rotation: 0,
-          startAngle: 0,
-          endAngle: Math.PI * 2,
-          counterclockwise: false
-        }, ...extras }
-
-      const ellipse = function(ctx: CanvasRenderingContext2D) {
-        ctx.ellipse(center.x, center.y, size.width / 2, size.height / 2, effectiveExtras.rotation, effectiveExtras.startAngle, effectiveExtras.endAngle, effectiveExtras.counterclockwise)
-      }
-
       if(fillStyle != null) {
         this.applyFillStyle(fillStyle)
         this.context.beginPath()
-        ellipse(this.context)
+        pathFn(this.context)
         this.context.fill()
       }
       if(lineStyle != null) {
         this.applyLineStyle(lineStyle)
         this.context.beginPath()
-        ellipse(this.context)
+        pathFn(this.context)
         this.context.stroke()
       }
     })
+  }
+
+  /** Draws an ellipse. @see [CanvasRenderingContext2D.ellipse](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse) */
+  public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
+    const effectiveExtras: EllipseExtras = { ...{
+        rotation: 0,
+        startAngle: 0,
+        endAngle: Math.PI * 2,
+        counterclockwise: false
+      }, ...extras }
+
+    const ellipse = function(ctx: CanvasRenderingContext2D) {
+      ctx.ellipse(center.x, center.y, size.width / 2, size.height / 2, effectiveExtras.rotation, effectiveExtras.startAngle, effectiveExtras.endAngle, effectiveExtras.counterclockwise)
+    }
+
+    this.drawPath(ellipse, lineStyle, fillStyle)
+  }
+
+  /** Draws a rectangle specified by its top left corner and size. */
+  public drawRectangle(topLeft: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null) {
+    const rect = (ctx: CanvasRenderingContext2D) => {
+      ctx.rect(topLeft.x, topLeft.y, size.width, size.height)
+    }
+
+    this.drawPath(rect, lineStyle, fillStyle)
   }
 
 

@@ -1,6 +1,7 @@
 import { Gif } from './Gif'
 import { Image } from './blocks/Image'
-import { Color, ColorTable } from './ColorTable'
+import { ColorTable } from './ColorTable'
+import { Color } from './Color'
 
 
 export type Mask = {
@@ -23,9 +24,9 @@ export function makeSolidRectangle(color: Color, width: number, height: number, 
 
   if(globalTable) {
     gif.globalColorTable = table
-    image.isTableLocal = false
+    image.tableIsLocal = false
   } else {
-    image.isTableLocal = true
+    image.tableIsLocal = true
   }
 
   return gif
@@ -48,9 +49,9 @@ export function makeCheckerboard(evenColor: Color, oddColor: Color, width: numbe
 
   if(globalTable) {
     gif.globalColorTable = table
-    image.isTableLocal = false
+    image.tableIsLocal = false
   } else {
-    image.isTableLocal = true
+    image.tableIsLocal = true
   }
 
   return gif
@@ -86,10 +87,19 @@ export function makeGiflibExample(globalTable: boolean = true): Gif {
 
   if(globalTable) {
     gif.globalColorTable = table
-    image.isTableLocal = false
+    image.tableIsLocal = false
   } else {
-    image.isTableLocal = true
+    image.tableIsLocal = true
   }
 
+  return gif
+}
+
+
+/** Makes a GIF that just has a single image made with {@link Image.makePalette}. */
+export function makePalette(n: number): Gif {
+  const img = Image.makePalette(ColorTable.createEvenlyDistributed(n))
+  const gif = new Gif(img.width, img.height)
+  gif.blocks.push(img)
   return gif
 }
