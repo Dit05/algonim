@@ -7,7 +7,7 @@ import { BitVector } from "./BitVector"
 
 class CompactBinaryTree<TElem> {
 
-  public elements: { [key: number]: TElem }
+  public elements: { [key: number]: TElem } = {}
   public readonly bitWidth: number
 
   private readonly leftPtrs: Int32Array
@@ -16,13 +16,11 @@ class CompactBinaryTree<TElem> {
 
 
   public constructor(size: number, bitWidth: number) {
-    this.elements = {}
     this.bitWidth = bitWidth
 
     this.leftPtrs = new Int32Array(size * bitWidth)
     this.rightPtrs = new Int32Array(size * bitWidth)
-    this.leftPtrs.fill(-1)
-    this.rightPtrs.fill(-1)
+    this.clear()
   }
 
 
@@ -55,21 +53,23 @@ class CompactBinaryTree<TElem> {
   public clear() {
     this.leftPtrs.fill(-1)
     this.rightPtrs.fill(-1)
+    this.count = 0
     this.elements = {}
   }
 
   public addRoots(elementFn: (i: number) => TElem) {
-    for(let i = 0; i < this.bitWidth; i++) {
-      this.elements[-(this.traverseOrInsert(0, i) + 1)] = elementFn(i)
+    for(let i = 0; i < (1 << this.bitWidth); i++) {
+      const index = -(this.traverseOrInsert(0, i) + 1)
+      this.elements[index] = elementFn(i)
     }
   }
 
-  public getTextRepresentation(elementPredicate: (elem: TElem) => boolean, spacing: number | undefined = undefined): { [key: string]: TElem } {
+  public getTextRepresentation(elementPredicate: (elem: TElem) => boolean = (_elem) => true, spacing: number | undefined = undefined): { [key: string]: TElem } {
     function bitstring(bits: boolean[]) {
       let str = ''
       for(let i = 0; i < bits.length; i++) {
         str += (bits[i] ? '1' : '0')
-        if(spacing !== undefined && (i + 1) % spacing == 0 && i < bits.length - 1) {
+        if(spacing !== undefined && spacing > 0 && (i + 1) % spacing == 0 && i < bits.length - 1) {
           str += ' '
         }
       }
@@ -77,6 +77,7 @@ class CompactBinaryTree<TElem> {
     }
 
     const map: { [key: string]: TElem } = {}
+    spacing ??= this.bitWidth
 
     const indices: number[] = [ 0 ]
     const traces: boolean[][] = []
@@ -93,7 +94,7 @@ class CompactBinaryTree<TElem> {
         traces.push(trace.concat(true))
       }
 
-      if(elementPredicate(this.elements[top])) {
+      if(top in this.elements && elementPredicate(this.elements[top])) {
         map[bitstring(trace)] = this.elements[top]
       }
     }
@@ -111,7 +112,7 @@ export function validateInitialCodeSize(initialCodeSize: number) {
   if(initialCodeSize > 8) throw new RangeError("Initial code size must be at most 8.")
 }
 
-/** Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link gif/blocks/Image.Image.emitDataSubBlocks}. */
+/** Compresses data into a stream of bytes. Output does not include the code size. For this to be valid Raster Data in a GIF, it has to be segmented into data sub-blocks via {@link gif/Gif.Gif.emitDataSubBlocks}. */
 export type CompressionFn = (data: Iterable<number>, initialCodeSize: number) => Generator<number>
 
 
