@@ -148,11 +148,9 @@ export class TextWrapper {
   }
 
   private clipString(text: string, maxWidth: number, style: FontStyle, trimStart: boolean = false, trimEnd: boolean = true): ClipResult<string> {
-    // TODO some kind of heuristic to avoid splitting off 1 letter and looking stupid
-    // TODO avoid splitting groups of codepoints that shouldn't be separated, i.e. '\u{1f3f3}\ufe0f\u200d\u26a7\ufe0f'
 
     if(this.drawer.measureText(text, {}, style).width <= maxWidth) {
-      // Happy path: the text just fits
+      // Happy path: the text just fits as-is
       return {
         clipped: text,
         remainder: ''
@@ -204,6 +202,7 @@ export class TextWrapper {
 
       const width = this.drawer.measureText(trimAndAddHyphen(text.substring(0, mid), this.hyphen), {}, style).width
 
+      // This should, in theory, avoid splitting groups of codepoints that shouldn't be separated, i.e. '\u{1f3f3}\ufe0f\u200d\u26a7\ufe0f'
       if(width > maxWidth) {
         max = mid
       } else {
@@ -211,9 +210,23 @@ export class TextWrapper {
       }
     }
 
+    let splitIndex = min
+    // Avoid keeping only one or two characters at the end of a line (this might backfire horribly)
+    const minimumLonelyChars = 3
+    for(let i = splitIndex - 1; i >= Math.max(0, splitIndex - minimumLonelyChars); i--) {
+      if(charKind(text.charAt(i)) == 'whitespace') {
+        splitIndex = i + 1
+        break
+      }
+    }
+    if(splitIndex <= 0) {
+      console.error(`splitIndex was somehow ${splitIndex}. Setting it to at least 1.`)
+      splitIndex = 1
+    }
+
     return {
-      clipped: trimAndAddHyphen(text.substring(0, min), this.hyphen),
-      remainder: text.substring(min)
+      clipped: trimAndAddHyphen(text.substring(0, splitIndex), this.hyphen),
+      remainder: text.substring(splitIndex)
     }
   }
 
