@@ -1,7 +1,6 @@
 import { ByteVector } from './ByteVector'
-import { CouldBeIterable } from '@/util/TypeAdapters'
 import { Color, ColorUtil } from './Color'
-import { randomReduce } from './ColorReducer'
+import { ColorReducer, ColorArrays, toCounted } from './ColorReduction'
 
 
 export type LossArguments = {
@@ -31,18 +30,17 @@ export class ColorTable {
     this.colors = new Uint32Array(ColorTable.sizefieldToSize(sizefield))
   }
 
-  public static createQuantized(sizefield: number, colors: CouldBeIterable<Color> | ImageData): ColorTable {
+  public static createQuantized(reducer: ColorReducer, sizefield: number, input: ColorArrays | ImageData): ColorTable {
     const table = new ColorTable(sizefield)
 
     // Type narrowing my beloved
-    if(colors instanceof ImageData) {
-      colors = ColorUtil.imageDataToColors(colors)
+    if(input instanceof ImageData) {
+      input = toCounted(ColorUtil.imageDataToColors(input))
     }
 
-    // TODO swappable reducer (make it a class? => Strategy Pattern)
-    const reduced: ArrayLike<Color> = randomReduce(ColorTable.sizefieldToSize(sizefield), colors)
+    const reduced: ColorArrays = reducer.reduce(input, ColorTable.sizefieldToSize(sizefield))
     for(let i = 0; i < table.colors.length; i++) {
-      table.colors[i] = reduced[i]
+      table.colors[i] = reduced.colors[i]
     }
 
     return table

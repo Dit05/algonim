@@ -1,9 +1,11 @@
 import { Gif } from '@/gif/Gif'
 import { ColorTable } from './gif/ColorTable'
+import { RandomColorReducer, BitColorReducer, MatrixColorReducer } from './gif/ColorReduction'
 import { Image } from './gif/blocks/Image'
 import { GraphicControl } from './gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence} from '@/Sequence'
+import * as GIFTESTS from '@/gif/Tests'
 
 
 /**
@@ -128,6 +130,9 @@ export class Algonim extends HTMLElement {
       gif.globalColorTable = undefined
       // FIXME color matching takes forever with a large color table
 
+      const reducer = new BitColorReducer()
+      reducer.mode = 'undershoot'
+
       for(let i = 0; i < frames.length; i++) {
         const frame = frames[i]
 
@@ -135,7 +140,7 @@ export class Algonim extends HTMLElement {
         control.delay = frame.delay
         gif.blocks.push(control)
 
-        const localTable = ColorTable.createQuantized(3, frame.image)
+        const localTable = ColorTable.createQuantized(reducer, 3, frame.image)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         //image.compressionFn = stupidCompress // HACK
@@ -160,6 +165,18 @@ export class Algonim extends HTMLElement {
     }
   }
 
+}
+
+export function test() {
+  const input = {
+    colors: [ 0xffffff, 0xfffeff ],
+    counts: [ 1, 1 ]
+  }
+
+  const reducer = new BitColorReducer()
+  const output = reducer.reduce(input, 1)
+
+  console.log(output)
 }
 
 

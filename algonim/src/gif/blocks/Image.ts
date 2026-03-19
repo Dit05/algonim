@@ -2,6 +2,7 @@ import { ByteVector } from '../ByteVector'
 import { Block, Gif } from '../Gif'
 import { ColorTable } from '../ColorTable'
 import { ColorUtil } from '../Color'
+import { ColorReducer } from '../ColorReduction'
 import { compress, CompressionFn } from '../VLCLZW'
 import * as CONFIG from '@/config'
 
@@ -36,30 +37,25 @@ export class Image implements Block {
   }
 
 
-  public static fromCanvasImageData(imageData: ImageData, colorTable: ColorTable | undefined): Image {
+  public static fromCanvasImageData(imageData: ImageData, colorProvider: ColorTable): Image {
     if(imageData.colorSpace !== undefined && imageData.colorSpace !== 'srgb') {
       console.warn(`ImageData color space isn't 'srgb' (it's '${imageData.colorSpace}'), colors will likely be incorrect.`)
     }
 
-    return Image.fromColors(imageData.width, imageData.height, ColorUtil.imageDataToColors(imageData), colorTable)
+    return Image.fromColors(imageData.width, imageData.height, ColorUtil.imageDataToColors(imageData), colorProvider)
   }
 
   /**
   * Creates an image from a sequence of colors.
   *
-  * @param colors Obviously the length of this array must be `width * height` to be able to fill out the entire image.
-  * @param colorTable Color table to use. If `undefined`, one will be generated from the provided color data and stored as the result image's local color table.
+  * @param colors Obviously the length of this array must be `width * height` to be able to fill in the entire image.
+  * @param colorTable Color table to use. It will be stored in the resulting image and marked as local.
   */
-  public static fromColors(width: number, height: number, colors: Uint32Array, colorTable: ColorTable | undefined = undefined): Image {
+  public static fromColors(width: number, height: number, colors: Uint32Array, colorTable: ColorTable): Image {
     if(colors.length !== width * height) throw new RangeError("Size of colors must be width * height.")
 
-    const hadColorTable = colorTable !== undefined
-    if(colorTable === undefined) {
-      colorTable = ColorTable.createQuantized(ColorTable.MAX_SIZEFIELD, colors)
-    }
-
     const image = new Image(width, height, colorTable)
-    image.tableIsLocal = !hadColorTable
+    image.tableIsLocal = true
     for(let i = 0; i < width * height; i++) {
       image.indices[i] = colorTable.getClosestColorIndex(colors[i])
     }
