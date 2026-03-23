@@ -1,6 +1,6 @@
 import { Gif } from '@/gif/Gif'
 import { ColorTable } from './gif/ColorTable'
-import { RandomColorReducer, BitColorReducer, MatrixColorReducer } from './gif/ColorReduction'
+import { RandomColorReducer, BitColorReducer, MatrixColorReducer, TieredColorReducer } from './gif/ColorReduction'
 import { Image } from './gif/blocks/Image'
 import { GraphicControl } from './gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
@@ -130,8 +130,20 @@ export class Algonim extends HTMLElement {
       gif.globalColorTable = undefined
       // FIXME color matching takes forever with a large color table
 
-      const reducer = new BitColorReducer()
-      reducer.mode = 'undershoot'
+      const reducer = new TieredColorReducer([
+        {
+          limit: 1024,
+          reducer: new RandomColorReducer()
+        },
+        {
+          limit: Infinity,
+          reducer: function() {
+            const b = new BitColorReducer()
+            //b.mode = 'undershoot'
+            return b
+          }()
+        }
+      ])
 
       for(let i = 0; i < frames.length; i++) {
         const frame = frames[i]

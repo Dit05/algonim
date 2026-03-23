@@ -1,3 +1,4 @@
+// TODO split this into multiple modules
 import { Color, ColorUtil } from './Color'
 import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
 import * as CONFIG from '@/config'
@@ -70,6 +71,48 @@ export abstract class ColorReducer {
   }
   protected abstract _reduce(input: ColorArrays, targetSize: number): ColorArrays
 
+}
+
+export type Tier = {
+  reducer: ColorReducer,
+  limit: number
+}
+
+export class TieredColorReducer extends ColorReducer {
+  private readonly tiers: Tier[]
+
+  public constructor(tiers: Tier[]) {
+    super()
+
+    this.tiers = tiers.slice().sort((a, b) => a.limit - b.limit) // Sort by limit ascending
+  }
+
+  public getBound(): ReductionBound {
+    throw new Error('Method not implemented.') // TODO
+  }
+
+  protected _reduce(input: ColorArrays, targetSize: number): ColorArrays {
+    function failIfPastEnd(tiers: ArrayLike<Tier>, i: number): true | never /* Now THIS is a type! */ {
+      if(i >= tiers.length) {
+        throw new TypeError(`There's no tier that can handle a target size of ${targetSize}.`)
+      } else {
+        return true
+      }
+    }
+
+    let index = 0
+    while(failIfPastEnd(this.tiers, index) && input.colors.length > this.tiers[index].limit) {
+      index += 1
+    }
+
+    let workingArray = input
+    for(; index >= 0; index--) {
+      const effectiveTargetSize = index > 0 ? this.tiers[index - 1].limit : targetSize
+      workingArray = this.tiers[index].reducer.reduce(workingArray, effectiveTargetSize)
+    }
+
+    return workingArray
+  }
 }
 
 export class RandomColorReducer extends ColorReducer {
