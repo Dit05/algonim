@@ -88,7 +88,12 @@ export class TieredColorReducer extends ColorReducer {
   }
 
   public getBound(): ReductionBound {
-    throw new Error('Method not implemented.') // TODO
+    if(this.tiers.length > 0) {
+      return this.tiers[0].reducer.getBound()
+    } else {
+      console.warn("Calling getBound on TieredColorReducer with no tiers. Such an instance is invalid and will never produce a result.")
+      return 'exact'
+    }
   }
 
   protected _reduce(input: ColorArrays, targetSize: number): ColorArrays {
@@ -387,8 +392,8 @@ export class BitColorReducer extends ColorReducer {
       for(let i = 0; i < input.colors.length; i++) {
         if(red[i] && green[i] && blue[i]) {
           // Deleted
-          // TODO are we putting the counts in the right place?
-          outputCounts[Math.max(0, outputIndex - 1)] += input.counts[i]
+          if(CONFIG.CONSISTENCY_CHECKS && i <= 0) CONFIG.warnInconsistency("Color deletions should only occur starting at index 1.")
+          outputCounts[outputIndex - 1] += input.counts[i]
         } else {
           // Kept
           // TODO average out the discarded bits
