@@ -1,192 +1,6 @@
-// TODO split this into multiple modules
-import { Color, ColorUtil } from './Color'
-import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
+import { ColorReducer, ReductionBound, ColorArrays } from '../ColorReducer'
+import { ColorUtil } from '../Color'
 import * as CONFIG from '@/config'
-
-
-export type ReductionBound = 'exact' | 'upper' | 'lower'
-
-export type ColorArrays = {
-  colors: ArrayLike<Color>,
-  counts: ArrayLike<number>
-}
-
-export function checkInput(input: ColorArrays, targetSize: number | undefined = undefined) {
-  if(input.colors.length != input.counts.length) throw new RangeError("colors.length must equal counts.length.")
-  if(targetSize !== undefined && targetSize > input.colors.length) throw new RangeError("targetSize must not exceed input array lengths.")
-}
-
-export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
-  colors = makeIterable(colors)
-  const map = new Map<number, number>()
-
-  for(const color of colors) {
-    map.set(color, (map.get(color) ?? 0) + 1)
-  }
-
-  const arrays = {
-    colors: new Array(map.size),
-    counts: new Array(map.size)
-  }
-
-  let i = 0
-  for(const kvp of map) {
-    arrays.colors[i] = kvp[0]
-    arrays.counts[i] = kvp[1]
-    i += 1
-  }
-
-  return arrays
-}
-
-
-export abstract class ColorReducer {
-
-  public abstract getBound(): ReductionBound
-
-  public reduce(input: ColorArrays, targetSize: number): ColorArrays {
-    function sumCounts(array: ArrayLike<number>): number | undefined {
-      if(CONFIG.CONSISTENCY_CHECKS) {
-        let sum = 0
-        for(let i = 0; i < array.length; i++) {
-          const here = array[i]
-          if(isNaN(here)) CONFIG.warnInconsistency(`counts[${i}] is NaN`)
-          else if(!isFinite(here)) CONFIG.warnInconsistency(`counts[${i}] is not finite`)
-          sum += here
-        }
-        return sum
-      } else {
-        return undefined
-      }
-    }
-
-    checkInput(input, targetSize)
-
-    const preCounts = sumCounts(input.counts)
-    const result = this._reduce(input, targetSize)
-    const postCounts = sumCounts(result.counts)
-    if(postCounts != preCounts) CONFIG.warnInconsistency(`Sum of counts array must remain unchanged after reduction. (was ${preCounts}, became ${postCounts})`)
-
-    return result
-  }
-  protected abstract _reduce(input: ColorArrays, targetSize: number): ColorArrays
-
-}
-
-export type Tier = {
-  reducer: ColorReducer,
-  limit: number
-}
-
-export class TieredColorReducer extends ColorReducer {
-  private readonly tiers: Tier[]
-
-  public constructor(tiers: Tier[]) {
-    super()
-
-    this.tiers = tiers.slice().sort((a, b) => a.limit - b.limit) // Sort by limit ascending
-  }
-
-  public getBound(): ReductionBound {
-    if(this.tiers.length > 0) {
-      return this.tiers[0].reducer.getBound()
-    } else {
-      console.warn("Calling getBound on TieredColorReducer with no tiers. Such an instance is invalid and will never produce a result.")
-      return 'exact'
-    }
-  }
-
-  protected _reduce(input: ColorArrays, targetSize: number): ColorArrays {
-    function failIfPastEnd(tiers: ArrayLike<Tier>, i: number): true | never /* Now THIS is a type! */ {
-      if(i >= tiers.length) {
-        throw new TypeError(`There's no tier that can handle a target size of ${targetSize}.`)
-      } else {
-        return true
-      }
-    }
-
-    let index = 0
-    while(failIfPastEnd(this.tiers, index) && input.colors.length > this.tiers[index].limit) {
-      index += 1
-    }
-
-    let workingArray = input
-    for(; index >= 0; index--) {
-      const effectiveTargetSize = index > 0 ? this.tiers[index - 1].limit : targetSize
-      workingArray = this.tiers[index].reducer.reduce(workingArray, effectiveTargetSize)
-    }
-
-    return workingArray
-  }
-}
-
-export class RandomColorReducer extends ColorReducer {
-
-  public getBound(): ReductionBound { return 'exact' }
-
-  protected override _reduce(input: ColorArrays, targetSize: number): ColorArrays {
-    if(targetSize <= 0) {
-      return {
-        colors: [],
-        counts: []
-      }
-    } else if(targetSize == input.colors.length) {
-      return input
-    }
-
-    const inverted = targetSize > input.colors.length / 2
-    if(inverted) {
-      targetSize = input.colors.length - targetSize
-    }
-
-    const pickedIndices = new Set<number>()
-    while(pickedIndices.size < targetSize) {
-      const index = Math.floor(Math.random() * input.colors.length)
-      if(!pickedIndices.has(index)) {
-        pickedIndices.add(index)
-      }
-    }
-
-    if(inverted) {
-      targetSize = input.colors.length - targetSize
-    }
-
-    let nextOutputIndex = 0
-    const colors = new Array(targetSize)
-    const counts = new Array(targetSize)
-
-    // Keep track of how much count we're not including
-    let unpickedCount = 0
-    for(let i = 0; i < input.colors.length; i++) {
-      if(pickedIndices.has(i)) {
-        colors[nextOutputIndex] = input.colors[i]
-        counts[nextOutputIndex] = input.counts[i]
-        nextOutputIndex += 1
-      } else {
-        unpickedCount += input.counts[i]
-      }
-    }
-
-    // Redistribute it
-    const countForEveryOutput = Math.floor(unpickedCount / counts.length)
-    if(countForEveryOutput > 0) {
-      for(let i = 0; i < counts.length; i++) {
-        counts[i] += countForEveryOutput
-      }
-    }
-    unpickedCount -= countForEveryOutput * counts.length
-
-    while(unpickedCount --> 0) {
-      counts[Math.floor(Math.random() * counts.length)] += 1
-    }
-
-    return {
-      colors,
-      counts
-    }
-  }
-
-}
 
 
 type VisitSpot = {
@@ -330,12 +144,19 @@ export class BitColorReducer extends ColorReducer {
     // TODO under/overshoot
 
     const excludeCube: boolean[] = new Array((BYTE_LENGTH + 1) * (BYTE_LENGTH + 1) * (BYTE_LENGTH + 1))
-    function cube(x: number, y: number, z: number) {
+    function cubeIndex(x: number, y: number, z: number) {
       const STRIDE = BYTE_LENGTH + 1
       return (z * STRIDE * STRIDE) + (y * STRIDE) + x
     }
     function excludePast(x: number, y: number, z: number) {
       // TODO
+      for(let k = z; k >= 0; k--) {
+        for(let j = y; j >= 0; j--) {
+          for(let i = x; i >= 0; i--) {
+            excludeCube[cubeIndex(i, j, k)] = true
+          }
+        }
+      }
     }
 
     // Find the spot with the most bits preserved where removing any more bits would make it overshoot
@@ -346,15 +167,17 @@ export class BitColorReducer extends ColorReducer {
 
     console.log(BitColorReducer.getVisitOrder())
     for(const spot of BitColorReducer.getVisitOrder()) {
+      if(excludeCube[cubeIndex(spot.r, spot.g, spot.b)] === true) continue
+
       const sizeHere = computeSizeWithThisManyBits(spot.r, spot.g, spot.b)
 
-      // TODO break loss ties based on overshoot
       if(sizeHere <= targetSize) {
-        if(bestSpot === undefined || spot.loss < bestLoss) {
+        // We just overshot
+        if(bestSpot === undefined || (spot.loss <= bestLoss && sizeHere > bestSize)) {
           bestSpot = spot
           bestSize = sizeHere
           bestLoss = spot.loss
-          console.log(bestSpot)
+          console.log(`${bestSpot} ${bestLoss} ${bestSize}`)
         }
       }
     }
@@ -411,16 +234,3 @@ export class BitColorReducer extends ColorReducer {
   }
 
 }
-
-
-export class MatrixColorReducer/* extends ColorReducer*/ {
-}
-
-// TODO
-// broadphase: delete low bits of color channels (make sure they are different by at most 1 at a time)
-// can we get within target size by trimming all channels?
-//   yes: try to selectively trim only some channels (8*8*8 cube (if we reached the limit with a component, we can skip everything beyond it in that line, since decreasing bits would just decrease colors further))
-//   no: trim all channels
-// unbroad phase: table color merge-inator
-
-// 1.) if we reached the limit with a channel, we know removing more bits of any channel will just make an overshoot but with more bits
