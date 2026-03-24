@@ -62,11 +62,6 @@ export class BitColorReducer extends ColorReducer {
     let greens = new Array(input.colors.length)
     let blues = new Array(input.colors.length)
 
-    let active = new Array(input.colors.length)
-    for(let i = 0; i < input.colors.length; i++) {
-      active[i] = i
-    }
-
 
     // Genuis! Sort colors so that the ones merged by bit discarding become adjecent for easier counting
     for(let i = 0; i < input.colors.length; i++) {
@@ -75,9 +70,14 @@ export class BitColorReducer extends ColorReducer {
       blues[i] = reverseBits(ColorUtil.getBlue(input.colors[i]))
     }
 
-    const byRed = [...active].sort((a, b) => reds[a] - reds[b])
-    const byGreen = [...active].sort((a, b) => greens[a] - greens[b])
-    const byBlue = [...active].sort((a, b) => blues[a] - blues[b])
+
+    const indicesAscending = new Array(input.colors.length)
+    for(let i = 0; i < input.colors.length; i++) {
+      indicesAscending[i] = i
+    }
+    const byRed = [...indicesAscending].sort((a, b) => reds[a] - reds[b])
+    const byGreen = [...indicesAscending].sort((a, b) => greens[a] - greens[b])
+    const byBlue = [...indicesAscending].sort((a, b) => blues[a] - blues[b])
 
     for(let i = 0; i < input.colors.length; i++) {
       reds[i] = reverseBits(reds[i])
@@ -117,20 +117,39 @@ export class BitColorReducer extends ColorReducer {
       return deletes
     }
 
-    // TODO make these lazy?
-    const redMasks = new Array(BYTE_LENGTH + 1)
-    const greenMasks = new Array(BYTE_LENGTH + 1)
-    const blueMasks = new Array(BYTE_LENGTH + 1)
-    for(let i = 0; i <= BYTE_LENGTH; i++) {
-      redMasks[i] = computeMask(byRed, reds, i)
-      greenMasks[i] = computeMask(byGreen, greens, i)
-      blueMasks[i] = computeMask(byBlue, blues, i)
+    const redMasks: (boolean[] | undefined)[] = new Array(BYTE_LENGTH + 1)
+    const greenMasks: (boolean[] | undefined)[] = new Array(BYTE_LENGTH + 1)
+    const blueMasks: (boolean[] | undefined)[] = new Array(BYTE_LENGTH + 1)
+
+    // Gets and potentially lazy-initializes masks arrays.
+    function getMaskArray(channel: 'red' | 'green' | 'blue', bits: number): boolean[] {
+      let arrays: (boolean[] | undefined)[]
+      switch(channel) {
+        case 'red': arrays = redMasks; break
+        case 'green': arrays = greenMasks; break
+        case 'blue': arrays = blueMasks; break
+      }
+
+      if(arrays[bits] === undefined) {
+        switch(channel) {
+          case 'red':
+            arrays[bits] = computeMask(byRed, reds, bits)
+            break
+          case 'green':
+            arrays[bits] = computeMask(byGreen, greens, bits)
+            break
+          case 'blue':
+            arrays[bits] = computeMask(byBlue, blues, bits)
+            break
+        }
+      }
+      return arrays[bits]
     }
 
     function computeSizeWithThisManyBits(redBits: number, greenBits: number, blueBits: number) {
-      const red = redMasks[redBits]
-      const green = greenMasks[greenBits]
-      const blue = blueMasks[blueBits]
+      const red = getMaskArray('red', redBits)
+      const green = getMaskArray('green', greenBits)
+      const blue = getMaskArray('blue', blueBits)
 
       let removed = 0
       for(let i = 0; i < red.length; i++) {
@@ -141,15 +160,12 @@ export class BitColorReducer extends ColorReducer {
     }
 
 
-    // TODO under/overshoot
-
     const excludeCube: boolean[] = new Array((BYTE_LENGTH + 1) * (BYTE_LENGTH + 1) * (BYTE_LENGTH + 1))
     function cubeIndex(x: number, y: number, z: number) {
       const STRIDE = BYTE_LENGTH + 1
       return (z * STRIDE * STRIDE) + (y * STRIDE) + x
     }
     function excludePast(x: number, y: number, z: number) {
-      // TODO
       for(let k = z; k >= 0; k--) {
         for(let j = y; j >= 0; j--) {
           for(let i = x; i >= 0; i--) {
@@ -165,7 +181,6 @@ export class BitColorReducer extends ColorReducer {
     let bestSize: number = NaN
     let bestLoss: number | undefined = Infinity
 
-    console.log(BitColorReducer.getVisitOrder())
     for(const spot of BitColorReducer.getVisitOrder()) {
       if(excludeCube[cubeIndex(spot.r, spot.g, spot.b)] === true) continue
 
@@ -173,6 +188,7 @@ export class BitColorReducer extends ColorReducer {
 
       if(sizeHere <= targetSize) {
         // We just overshot
+        excludePast(spot.r, spot.g, spot.b)
         if(bestSpot === undefined || (spot.loss <= bestLoss && sizeHere > bestSize)) {
           bestSpot = spot
           bestSize = sizeHere
@@ -209,12 +225,13 @@ export class BitColorReducer extends ColorReducer {
       const outputCounts = new Uint32Array(bestSize)
 
       let outputIndex = 0
-      const red = redMasks[bestSpot.r]
-      const green = greenMasks[bestSpot.g]
-      const blue = blueMasks[bestSpot.b]
+      const red = getMaskArray('red', bestSpot.r)
+      const green = getMaskArray('green', bestSpot.g)
+      const blue = getMaskArray('blue', bestSpot.b)
       for(let i = 0; i < input.colors.length; i++) {
         if(red[i] && green[i] && blue[i]) {
           // Deleted
+          // FIXME this can happen (actually, I can kinda see that)
           if(CONFIG.CONSISTENCY_CHECKS && i <= 0) CONFIG.warnInconsistency("Color deletions should only occur starting at index 1.")
           outputCounts[outputIndex - 1] += input.counts[i]
         } else {

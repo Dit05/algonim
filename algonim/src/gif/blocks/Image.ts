@@ -2,7 +2,6 @@ import { ByteVector } from '../ByteVector'
 import { Block, Gif } from '../Gif'
 import { ColorTable } from '../ColorTable'
 import { ColorUtil } from '../Color'
-import { ColorReducer } from '../ColorReduction'
 import { compress, CompressionFn } from '../VLCLZW'
 import * as CONFIG from '@/config'
 

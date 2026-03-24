@@ -1,6 +1,6 @@
 import { ByteVector } from './ByteVector'
 import { Color, ColorUtil } from './Color'
-import { ColorReducer, ColorArrays, toCounted } from './ColorReduction'
+import { ColorReducer, ColorArrays, toCounted } from './ColorReducer'
 
 
 export type LossArguments = {

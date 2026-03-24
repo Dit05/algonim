@@ -180,15 +180,7 @@ export class Algonim extends HTMLElement {
 }
 
 export function test() {
-  const input = {
-    colors: [ 0xffffff, 0xfffeff ],
-    counts: [ 1, 1 ]
-  }
-
-  const reducer = new BitColorReducer()
-  const output = reducer.reduce(input, 1)
-
-  console.log(output)
+  console.log('<empty>')
 }
 
 
