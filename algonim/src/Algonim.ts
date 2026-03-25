@@ -4,7 +4,7 @@ import { Image } from '@/gif/blocks/Image'
 import { GraphicControl } from '@/gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence} from '@/Sequence'
-import * as ColorReducers from '@/gif/ColorReducers'
+import * as ColorReducers from '@/gif/color_reducers'
 import * as GIFTESTS from '@/gif/Tests'
 
 
@@ -132,14 +132,14 @@ export class Algonim extends HTMLElement {
 
       const reducer = new ColorReducers.Tiered([
         {
-          limit: 1024,
+          limit: 256,
           reducer: new ColorReducers.Random()
         },
         {
           limit: Infinity,
           reducer: function() {
             const b = new ColorReducers.Bit()
-            //b.mode = 'undershoot'
+            b.mode = 'undershoot'
             return b
           }()
         }
@@ -152,7 +152,7 @@ export class Algonim extends HTMLElement {
         control.delay = frame.delay
         gif.blocks.push(control)
 
-        const localTable = ColorTable.createQuantized(reducer, 3, frame.image)
+        const localTable = ColorTable.createQuantized(reducer, 7, frame.image)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         //image.compressionFn = stupidCompress // HACK

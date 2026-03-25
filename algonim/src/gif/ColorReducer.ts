@@ -1,4 +1,3 @@
-// TODO split this into multiple modules
 import { Color, ColorUtil } from './Color'
 import { CouldBeIterable, makeIterable } from '@/util/TypeAdapters'
 import * as CONFIG from '@/config'
@@ -35,6 +34,8 @@ export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
     arrays.counts[i] = kvp[1]
     i += 1
   }
+
+  CONFIG.consistencyShuffle(arrays.colors, arrays.counts)
 
   return arrays
 }

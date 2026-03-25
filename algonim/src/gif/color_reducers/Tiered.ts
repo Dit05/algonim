@@ -40,7 +40,8 @@ export class TieredColorReducer extends ColorReducer {
 
     let workingArray = input
     for(; index >= 0; index--) {
-      const effectiveTargetSize = index > 0 ? this.tiers[index - 1].limit : targetSize
+      let effectiveTargetSize = index > 0 ? this.tiers[index - 1].limit : targetSize
+      effectiveTargetSize = Math.min(workingArray.colors.length, effectiveTargetSize)
       workingArray = this.tiers[index].reducer.reduce(workingArray, effectiveTargetSize)
     }
 

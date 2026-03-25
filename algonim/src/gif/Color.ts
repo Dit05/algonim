@@ -16,11 +16,12 @@ export class ColorUtil {
   */
   public static fromChannels(red: number, green: number, blue: number, convert: (x: number) => number): Color {
     function clamp(x: number) {
+      x = Math.round(x)
       if(x > 255) {
         return 255
       } else if(x >= 0) {
         // Returning the input purposefully isn't in the else branch, since NaN would also compare as ">= 0 but < 255"
-        return Math.round(x)
+        return x
       } else {
         return 0
       }
