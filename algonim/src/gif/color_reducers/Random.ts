@@ -16,20 +16,14 @@ export class RandomColorReducer extends ColorReducer {
     }
 
     const inverted = targetSize > input.colors.length / 2
-    if(inverted) {
-      targetSize = input.colors.length - targetSize
-    }
 
+    const pickCount = inverted ? input.colors.length - targetSize : targetSize
     const pickedIndices = new Set<number>()
-    while(pickedIndices.size < targetSize) {
+    while(pickedIndices.size < pickCount) {
       const index = Math.floor(Math.random() * input.colors.length)
       if(!pickedIndices.has(index)) {
         pickedIndices.add(index)
       }
-    }
-
-    if(inverted) {
-      targetSize = input.colors.length - targetSize
     }
 
     let nextOutputIndex = 0
@@ -39,7 +33,7 @@ export class RandomColorReducer extends ColorReducer {
     // Keep track of how much count we're not including
     let unpickedCount = 0
     for(let i = 0; i < input.colors.length; i++) {
-      if(pickedIndices.has(i)) {
+      if(pickedIndices.has(i) !== inverted) {
         colors[nextOutputIndex] = input.colors[i]
         counts[nextOutputIndex] = input.counts[i]
         nextOutputIndex += 1
