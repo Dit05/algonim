@@ -11,14 +11,16 @@
       }
     </script>
   </head>
-  <body>
-    <div style="margin: 0; padding: 0; width: 100%; height: 100lvh;">
-      <algonim-element delay=1000></algonim-element><br>
-      <div>
-        <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
-        <button onclick="window.Algonim.test()">test 123456</button>
-        <progress id="gif-progress" hidden="true"></progress>
-        <a href="./docs/index.html">docs</a>
+  <body style="margin: 0;">
+
+    <div style="min-height: 100vh;">
+      <div style="margin: 8px;">
+        <algonim-element></algonim-element><br>
+        <div>
+          <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
+          <progress id="gif-progress" hidden="true"></progress>
+          <a href="./docs/index.html">docs</a>
+        </div>
       </div>
     </div>
 
@@ -32,6 +34,8 @@
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
       const animationFunc = async (seq) => {
+        seq.config.resolution = { width: 640, height: 480 }
+
         const code = seq.createModel('code')
         code.setLines([
           'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
@@ -113,13 +117,14 @@
       }
 
       const rainbowFunc = async function(seq) {
+        seq.config.resolution = { width: 512, height: 256 }
         const rainbow = seq.createModel('rainbow')
-        rainbow.step = { x: 4, y: 4 }
+        rainbow.step = { x: 2, y: 2 }
         seq.setLayout(rainbow)
         await seq.keyframe()
       }
 
-      const chosenFunc = rainbowFunc
+      const chosenFunc = animationFunc
       algonim.slideshow(chosenFunc)
     </script>
   </body>

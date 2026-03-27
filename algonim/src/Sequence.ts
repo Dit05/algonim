@@ -10,26 +10,39 @@ export type Layout = Model
   | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
   | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
+const DEFAULT_SEQUENCE_CONFIG = {
+  defaultDelayMs: 1000,
+  resolution: Size(640, 480)
+}
+export type SequenceConfig = typeof DEFAULT_SEQUENCE_CONFIG
+
 /** Plays an animation sequence. @see {@link Algonim!Algonim.slideshow} */
 export type SequenceFn = (seq: Sequence) => Promise<void>
 
 /** Can be subscribed to a sequence to receive rendered frames from it. @see {@link Sequence.addImageDataConsumer} */
-export type ImageDataConsumerFn = (img: ImageData) => void
+export type FrameConsumerFn = (frame: Frame) => void
+export type Frame = {
+  imageData: ImageData,
+  delayMs: number
+}
 
 
 // TODO the ability to cancel
 export class Sequence {
 
+  public readonly config: SequenceConfig = { ...DEFAULT_SEQUENCE_CONFIG }
+
   protected readonly canvas: HTMLCanvasElement
+  private readonly ignoreDelays: boolean
   private readonly modelConstructors: { [key: string]: () => Model } = {}
-  private readonly imageDataConsumers: ImageDataConsumerFn[] = []
+  private readonly imageDataConsumers: FrameConsumerFn[] = []
 
   protected rootPane: Pane | null = null
-  public delay: number = 0
 
 
-  public constructor(canvas: HTMLCanvasElement) {
+  public constructor(canvas: HTMLCanvasElement, ignoreDelays: boolean = false) {
     this.canvas = canvas
+    this.ignoreDelays = ignoreDelays
 
     // Register built-in models
     this.registerModel('code', () => new Models.Code())
@@ -39,7 +52,7 @@ export class Sequence {
 
 
   /** Registers a function to receive image data after every drawn frame. */
-  public addImageDataConsumer(consumer: ImageDataConsumerFn) {
+  public addImageDataConsumer(consumer: FrameConsumerFn) {
     this.imageDataConsumers.push(consumer)
   }
 
@@ -77,11 +90,23 @@ export class Sequence {
 
   /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */
   public async keyframe(delayScale: number = 1) {
-    this.redraw()
+    const delay = this.config.defaultDelayMs * Math.max(0, delayScale)
 
-    delayScale = Math.max(0, delayScale)
+    const drawer: Drawer = this.redraw()
+
+    // Pass image data to consumers (if any)
+    if(this.imageDataConsumers.length > 0) {
+      const img: ImageData = drawer.getImageData({ colorSpace: 'srgb' })
+      for(let consumer of this.imageDataConsumers) {
+        consumer({
+          imageData: img,
+          delayMs: delay
+        })
+      }
+    }
+
     return new Promise((resolve) => {
-      setTimeout(resolve, this.delay * delayScale)
+      setTimeout(resolve, this.ignoreDelays ? 0 : delay)
     })
   }
 
@@ -107,6 +132,9 @@ export class Sequence {
   redraw(): Drawer {
     const CONTEXT_ID = '2d'
 
+    this.canvas.width = this.config.resolution.width
+    this.canvas.height = this.config.resolution.height
+
     // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
     const ctx = this.canvas.getContext(CONTEXT_ID)
     if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
@@ -117,14 +145,6 @@ export class Sequence {
 
     if(this.rootPane !== null) {
       this.rootPane.draw(drawer)
-    }
-
-    // Pass image data to consumers (if any)
-    if(this.imageDataConsumers.length > 0) {
-      const img: ImageData = drawer.getImageData({ colorSpace: 'srgb' })
-      for(let consumer of this.imageDataConsumers) {
-        consumer(img)
-      }
     }
 
     return drawer

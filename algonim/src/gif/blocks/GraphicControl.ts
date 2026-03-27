@@ -37,7 +37,7 @@ export class GraphicControl implements Block {
     packedField |= ((this.transparentIndex !== undefined) ? 1 : 0)
     vec.addUint8(packedField)
 
-    vec.addUint16(this.delay)
+    vec.addUint16(Math.max(0, Math.min(Math.round(this.delay), 0xffff)))
 
     // TODO should it actually be missing when undefined?
     vec.addUint8((this.transparentIndex !== undefined) ? this.transparentIndex : 0)
