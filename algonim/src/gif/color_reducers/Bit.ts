@@ -1,5 +1,6 @@
 import { ColorReducer, ReductionBound, ColorArrays } from '../ColorReducer'
 import { Color, ColorUtil } from '../Color'
+import * as CONFIG from '@/config'
 
 
 type VisitSpot = {
@@ -64,21 +65,19 @@ export class BitColorReducer extends ColorReducer {
 
 
     function reduceBits(redBits: number, greenBits: number, blueBits: number): Map<Color, number> {
-      // TODO average
       function bitmask(bits: number) {
         return ((1 << bits) - 1) << (BYTE_LENGTH - bits) // Masks only the considered highest bits.
       }
-
-      let avgRed = 0
-      let avgGreen = 0
-      let avgBlue = 0
-      let avgWeight = 0
-      let countAccumulator = 0 // Like avgWeight, but unscaled.
-
-      const map = new Map()
       const redMask = bitmask(redBits)
       const greenMask = bitmask(greenBits)
       const blueMask = bitmask(blueBits)
+
+      const map = new Map<Color, {
+        count: number,
+        avgRed: number,
+        avgGreen: number,
+        avgBlue: number
+      }>()
 
       for(let i = 0; i < input.colors.length; i++) {
         const quantized: Color = ColorUtil.rgb8(
@@ -87,10 +86,38 @@ export class BitColorReducer extends ColorReducer {
           blues[i] & blueMask
         )
 
-        map.set(quantized, (map.get(quantized) ?? 0) + input.counts[i])
+        let elem = map.get(quantized)
+        if(elem === undefined) {
+          elem = {
+            count: 0,
+            avgRed: 0,
+            avgGreen: 0,
+            avgBlue: 0
+          }
+          map.set(quantized, elem)
+        }
+
+        const count = input.counts[i]
+        // JavaScript numbers are 64-bit floats, which should have integer precisions up until the quadrillions.
+        elem.count += count
+        elem.avgRed += reds[i] * count
+        elem.avgGreen += greens[i] * count
+        elem.avgBlue += blues[i] * count
       }
 
-      return map
+      const finalMap = new Map<Color, number>()
+      for(const kvp of map) {
+        finalMap.set(
+          ColorUtil.rgb8(
+            kvp[1].avgRed / kvp[1].count,
+            kvp[1].avgGreen / kvp[1].count,
+            kvp[1].avgBlue / kvp[1].count
+          ),
+          kvp[1].count
+        )
+      }
+
+      return finalMap
     }
 
 
