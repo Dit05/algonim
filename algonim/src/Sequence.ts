@@ -10,11 +10,16 @@ export type Layout = Model
   | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
   | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
 
-const DEFAULT_SEQUENCE_CONFIG = {
+export type SequenceConfig = {
+  /** Default delay between consecutive frames. This can be scaled by the argument of {@link Sequence.capture}. */
+  defaultDelayMs: number,
+  /** Size of the canvas. This should be set to the desired value before capturing any frames. */
+  resolution: Size
+}
+const DEFAULT_SEQUENCE_CONFIG: SequenceConfig = {
   defaultDelayMs: 1000,
   resolution: Size(640, 480)
 }
-export type SequenceConfig = typeof DEFAULT_SEQUENCE_CONFIG
 
 /** Plays an animation sequence. @see {@link Algonim!Algonim.slideshow} */
 export type SequenceFn = (seq: Sequence) => Promise<void>

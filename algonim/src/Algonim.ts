@@ -7,6 +7,28 @@ import { SequenceFn, Sequence, Frame } from '@/Sequence'
 import * as ColorReducers from '@/gif/color_reducers'
 import * as GIFTESTS from '@/gif/Tests'
 
+//import * as Models from '@/models'
+//export const models = Models
+
+
+export type GifOptions = {
+  /** The value of {@link Algonim/gif/ColorTable!ColorTable.sizefield} will be one less than this. */
+  bitDepth: number,
+  /** Whether to use a new color table for every image instead of using a single global color table. */
+  useLocalColorTables: boolean, // TODO
+  /** Whether the animation should repeat. */
+  looping: boolean, // TODO
+  /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
+  encodingBufferSize: number
+}
+
+const DEFAULT_GIF_OPTIONS: GifOptions = {
+  bitDepth: 3,
+  useLocalColorTables: false,
+  looping: true,
+  encodingBufferSize: 1024
+}
+
 
 /**
 * Algonim's [custom HTML element](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements).
@@ -37,7 +59,9 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, bufferSize: number = 1024): Promise<Blob> {
+  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, options: Partial<GifOptions> = {}): Promise<Blob> {
+    const fullOptions: GifOptions = { ...DEFAULT_GIF_OPTIONS, ...options }
+
     const progress = {
       setHidden(hidden: boolean) {
         if(progressElement) progressElement.hidden = hidden
@@ -88,12 +112,8 @@ export class Algonim extends HTMLElement {
       // TODO loop
       const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
-      /*const stupidColorTable = new ColorTable(ColorTable.desiredSizeToSizefield(2) ?? -1)
-      stupidColorTable.colors[0] = ColorUtil.rgb8(0, 0, 0)
-      stupidColorTable.colors[1] = ColorUtil.rgb8(255, 255, 255)*/
-      //gif.globalColorTable = ColorTable.createEvenlyDistributed(2)
       gif.globalColorTable = undefined
-      // FIXME color matching takes forever with a large color table
+      // FIXME color matching takes quite a while with a large color table
 
       const reducer = new ColorReducers.Tiered([
         {
@@ -117,7 +137,8 @@ export class Algonim extends HTMLElement {
         control.delay = frame.delay
         gif.blocks.push(control)
 
-        const localTable = ColorTable.createQuantized(reducer, 2, frame.image)
+        // TODO globalable table
+        const localTable = ColorTable.createQuantized(reducer, fullOptions.bitDepth - 1, frame.image)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         //image.compressionFn = stupidCompress // HACK
@@ -127,7 +148,7 @@ export class Algonim extends HTMLElement {
         await progress.animationFrame()
       }
 
-      const vec = new ByteVector(bufferSize)
+      const vec = new ByteVector(options.encodingBufferSize)
       const steps = gif.createFileStaged()
       for(let i = 0; i < steps.length; i++) {
         steps[i](vec)

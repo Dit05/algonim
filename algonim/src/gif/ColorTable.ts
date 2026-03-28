@@ -19,7 +19,7 @@ export class ColorTable {
 
   /** Represents valid table sizes. @see {@link sizefieldToSize} */
   public readonly sizefield: number
-  /** Colors in the table. @see {@link color} */
+  /** Colors in the table. @see {@link Color} */
   public readonly colors: Uint32Array
   /** Whether colors are sorted in order of decreasing importance. */
   public ordered: boolean = false

@@ -1,6 +1,5 @@
 import { ColorReducer, ReductionBound, ColorArrays } from '../ColorReducer'
 import { Color, ColorUtil } from '../Color'
-import * as CONFIG from '@/config'
 
 
 type VisitSpot = {
@@ -121,34 +120,18 @@ export class BitColorReducer extends ColorReducer {
     }
 
 
-    const excludeCube: boolean[] = new Array((BYTE_LENGTH + 1) * (BYTE_LENGTH + 1) * (BYTE_LENGTH + 1))
-    function cubeIndex(x: number, y: number, z: number) {
-      const STRIDE = BYTE_LENGTH + 1
-      return (z * STRIDE * STRIDE) + (y * STRIDE) + x
-    }
-    function excludePast(x: number, y: number, z: number) {
-      for(let k = z; k >= 0; k--) {
-        for(let j = y; j >= 0; j--) {
-          for(let i = x; i >= 0; i--) {
-            excludeCube[cubeIndex(i, j, k)] = true
-          }
-        }
-      }
-    }
-
     // Find the spot with the most bits preserved where removing any more bits would make it overshoot
     let best: { spot: VisitSpot, map: Map<Color, number> } | undefined = undefined
     let lowestLoss: number | undefined = Infinity
 
     for(const spot of BitColorReducer.getVisitOrder()) {
-      if(excludeCube[cubeIndex(spot.r, spot.g, spot.b)] === true) continue
+      if(spot.loss > lowestLoss) break
 
       const reduced = reduceBits(spot.r, spot.g, spot.b)
       const sizeHere = reduced.size
 
       if(sizeHere <= targetSize) {
         // We just overshot
-        excludePast(spot.r, spot.g, spot.b)
         if(best === undefined || (spot.loss <= lowestLoss && sizeHere > best.map.size)) {
           best = {
             spot,
