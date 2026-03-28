@@ -88,8 +88,8 @@ export class Sequence {
     this.rootPane = Sequence.layoutToPane(layout, 50)
   }
 
-  /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */
-  public async keyframe(delayScale: number = 1) {
+  /** This should be called in sequence functions to request a frame to be drawn. @see {@link SequenceFn} */
+  public async capture(delayScale: number = 1) {
     const delay = this.config.defaultDelayMs * Math.max(0, delayScale)
 
     const drawer: Drawer = this.redraw()

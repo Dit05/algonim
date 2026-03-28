@@ -11,16 +11,21 @@
       }
     </script>
   </head>
-  <body style="margin: 0;">
+  <body>
 
-    <div style="min-height: 100vh;">
-      <div style="margin: 8px;">
-        <algonim-element></algonim-element><br>
-        <div>
-          <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
-          <progress id="gif-progress" hidden="true"></progress>
-          <a href="./docs/index.html">docs</a>
+    <div style="min-height: 100vh; margin-right: 8px;">
+      <algonim-element></algonim-element><br>
+      <div style="width: 100%; display: flex; flex-direction: row;">
+        <textarea id="script-area" style="width: 40vw; height: 30em; margin-bottom: -3px;">textarea</textarea>
+        <div style="flex-grow: 1;">
+          <iframe style="width: 100%; height: 100%;" src="./docs/index.html"></iframe>
         </div>
+      </div>
+      <div>
+        <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
+        <button onclick="document.getElementById('script-area').textContent = animationFunc"></button>
+        <progress id="gif-progress" hidden="true"></progress>
+        <a href="./docs/index.html">docs</a>
       </div>
     </div>
 
@@ -84,36 +89,36 @@
 
         seq.setLayout(layout)
 
-        await seq.keyframe()
+        await seq.capture()
 
         let i = 3
         const iSign = code.createSign(0)
         iSign.text = `${i}`
 
         code.arrowLines = 1
-        await seq.keyframe()
+        await seq.capture()
         while(i > 0) {
           code.arrowLines = 2
-          await seq.keyframe()
+          await seq.capture()
           outputLines.push(`${i}`)
           fakeConsole.setLines(outputLines)
-          await seq.keyframe()
+          await seq.capture()
           i -= 1
           iSign.text = `${i}`
           code.arrowLines = 3
-          await seq.keyframe()
+          await seq.capture()
           code.arrowLines = 1
-          await seq.keyframe()
+          await seq.capture()
         }
         code.arrowLines = 4
-        await seq.keyframe()
+        await seq.capture()
 
         code.arrowLines = null
-        await seq.keyframe()
+        await seq.capture()
 
         iSign.destroy()
         code.createSign(4).text = 'Fin.'
-        await seq.keyframe()
+        await seq.capture()
       }
 
       const rainbowFunc = async function(seq) {
@@ -121,10 +126,10 @@
         const rainbow = seq.createModel('rainbow')
         rainbow.step = { x: 2, y: 2 }
         seq.setLayout(rainbow)
-        await seq.keyframe()
+        await seq.capture()
       }
 
-      const chosenFunc = animationFunc
+      const chosenFunc = rainbowFunc
       algonim.slideshow(chosenFunc)
     </script>
   </body>
