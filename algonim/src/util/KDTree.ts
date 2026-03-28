@@ -1,0 +1,220 @@
+
+
+type Leaf = { parent: Node | undefined, point: number[] }
+type Branch = {
+  parent: Node | undefined,
+  splitValue: number,
+  low: Node,
+  high: Node
+}
+type Node = Leaf | Branch
+
+type PartialBranch = {
+  parent: Node | undefined,
+  splitValue: number,
+  low: PartialNode | undefined,
+  high: PartialNode | undefined
+}
+type PartialNode = Leaf | PartialBranch
+
+function unpartial(partial: PartialNode): Node {
+  if('point' in partial) {
+    return partial
+  } else {
+    if(partial.low === undefined) throw new RangeError("Cannot unpartial node: low is undefined.")
+    if(partial.high === undefined) throw new RangeError("Cannot unpartial node: high is undefined.")
+    return {
+      parent: undefined,
+      splitValue: partial.splitValue,
+      low: unpartial(partial.low),
+      high: unpartial(partial.high)
+    }
+  }
+}
+
+
+export class KDTree {
+
+  public readonly dimensions: number
+  private readonly root: Node
+
+
+  public constructor(pointSource: Iterable<ArrayLike<number>>) {
+    // Collect all the points into a list
+    const allPoints: number[][] = []
+
+    let dimensions: number | undefined = undefined
+    for(const point of pointSource) {
+      // Check dimensionality
+      if(point.length === 0) throw new RangeError("Zero-dimensional points are not supported.")
+
+      if(dimensions === undefined) {
+        dimensions = point.length
+      } else if(point.length !== dimensions) {
+        console.log(`Dimension mismatch between input points: previously established as ${dimensions}, but a new point had ${point.length}.`)
+      }
+
+      // Add it to our list
+      const added: number[] = Array(dimensions)
+      for(let i = 0; i < point.length; i++) {
+        added[i] = point[i]
+      }
+      allPoints.push(added)
+    }
+
+    if(dimensions === undefined) throw new RangeError("Input sequence contains no points.")
+    this.dimensions = dimensions
+
+
+    let root: undefined | PartialNode = undefined
+
+    const stack: {
+      points: number[][],
+      splitAxis: number,
+      parent: { branch: PartialBranch, high: boolean } | undefined
+    }[] = []
+    stack.push({
+      points: allPoints,
+      splitAxis: 0,
+      parent: undefined
+    })
+
+    while(true) {
+      const elem = stack.pop()
+      if(elem === undefined) break
+
+      let newNode: PartialNode
+      if(elem.points.length < 1) {
+        throw new Error("This should never happen.")
+      } else if(elem.points.length === 1) {
+        // Leaf
+        newNode = { parent: undefined, point: elem.points[0] }
+      } else {
+        // Branch
+        elem.points.sort((a, b) => {
+          return a[elem.splitAxis] - b[elem.splitAxis]
+        })
+
+        // This should be the median point.
+        const midIndex = Math.floor(elem.points.length / 2)
+        const splitValue = (elem.points[midIndex][elem.splitAxis] + elem.points[midIndex + 1][elem.splitAxis]) / 2
+
+        newNode = {
+          parent: undefined,
+          splitValue,
+          low: undefined,
+          high: undefined
+        }
+
+        stack.push({
+          points: elem.points.slice(0, midIndex),
+          splitAxis: (elem.splitAxis + 1) % dimensions,
+          parent: { branch: newNode, high: false }
+        })
+        stack.push({
+          points: elem.points.slice(midIndex),
+          splitAxis: (elem.splitAxis + 1) % dimensions,
+          parent: { branch: newNode, high: true }
+        })
+      }
+
+      if(elem.parent !== undefined) {
+        if(elem.parent.high) {
+          elem.parent.branch.high = newNode
+        } else {
+          elem.parent.branch.low = newNode
+        }
+      } else {
+        root = newNode
+      }
+    }
+
+
+    if(root === undefined) {
+      throw new Error("This should never happen.")
+    } else {
+      this.root = unpartial(root)
+    }
+
+    // Assign parents
+    const parentStack: Node[] = [this.root]
+    while(true) {
+      const node = parentStack.pop()
+      if(node === undefined) break
+
+      if('splitValue' in node) {
+        node.high.parent = node
+        node.low.parent = node
+        parentStack.push(node.high)
+        parentStack.push(node.low)
+      } else {
+        // Leaf, no action required.
+      }
+    }
+  }
+
+
+  private findBestInNode(target: ArrayLike<number>, searchRoot: Node, best: [{ point: ArrayLike<number>, distanceSq: number } | undefined]) {
+    let current: Node = searchRoot
+    let splitAxis: number = 0
+    while('splitValue' in current) {
+      if(target[splitAxis] < current.splitValue) {
+        current = current.low
+      } else {
+        current = current.high
+      }
+      splitAxis = (splitAxis + 1) % this.dimensions
+    }
+
+    let distanceSq = 0
+    for(let i = 0; i < this.dimensions; i++) {
+      const diff = current.point[i] - target[i]
+      distanceSq += diff * diff
+    }
+
+    if(best[0] === undefined) {
+      best[0] = {
+        point: current.point,
+        distanceSq: distanceSq
+      }
+    } else if(distanceSq < best[0].distanceSq) {
+      best[0].point = current.point
+      best[0].distanceSq = distanceSq
+    }
+
+    while(current !== searchRoot) {
+      if(current.parent === undefined) throw new Error("This should never happen.")
+      current = current.parent
+      splitAxis = (splitAxis > 0) ? splitAxis - 1 : this.dimensions - 1
+
+      if('splitValue' in current) {
+        const pos = best[0].point[splitAxis]
+        let planeDifference = current.splitValue - pos // TODO plane
+        if(planeDifference * planeDifference <= best[0].distanceSq) {
+          let subRoot: Node
+          if(pos < current.splitValue) {
+            subRoot = current.low
+          } else {
+            subRoot = current.high
+          }
+          this.findBestInNode(target, subRoot, best)
+        }
+      } else {
+        throw new Error("This should never happen.")
+      }
+    }
+  }
+
+  /** Given some target position, returns the nearest contained point to it. */
+  public findNearest(target: ArrayLike<number>): { point: ArrayLike<number>, distance: number } {
+    if(target.length < this.dimensions) throw new RangeError("Target point has less dimensions than this tree.")
+    const best: [{ point: ArrayLike<number>, distanceSq: number } | undefined] = [undefined]
+    this.findBestInNode(target, this.root, best)
+    if(best[0] === undefined) throw new Error("No closest point found. This should never happen.")
+    return {
+      point: best[0].point,
+      distance: Math.sqrt(best[0].distanceSq)
+    }
+  }
+
+}
