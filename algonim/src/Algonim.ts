@@ -1,8 +1,33 @@
-import { Point, Size } from '@/gfx/Primitives'
-import { Region } from '@/gfx/Region'
-import { Drawer } from '@/gfx/Drawer'
-import { Model } from '@/models/Model'
-import * as Models from '@/models'
+import { Gif } from '@/gif/Gif'
+import { ColorTable } from '@/gif/ColorTable'
+import { Image } from '@/gif/blocks/Image'
+import { GraphicControl } from '@/gif/blocks/GraphicControl'
+import { ByteVector } from '@/gif/ByteVector'
+import { SequenceFn, Sequence, Frame } from '@/Sequence'
+import * as ColorReducers from '@/gif/color_reducers'
+import * as GIFTESTS from '@/gif/Tests'
+
+//import * as Models from '@/models'
+//export const models = Models
+
+
+export type GifOptions = {
+  /** The value of {@link Algonim/gif/ColorTable!ColorTable.sizefield} will be one less than this. */
+  bitDepth: number,
+  /** Whether to use a new color table for every image instead of using a single global color table. */
+  useLocalColorTables: boolean, // TODO
+  /** Whether the animation should repeat. */
+  looping: boolean, // TODO
+  /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
+  encodingBufferSize: number
+}
+
+const DEFAULT_GIF_OPTIONS: GifOptions = {
+  bitDepth: 3,
+  useLocalColorTables: false,
+  looping: true,
+  encodingBufferSize: 1024
+}
 
 
 /**
@@ -10,228 +35,134 @@ import * as Models from '@/models'
 */
 export class Algonim extends HTMLElement {
 
-  protected static observedAttributes = ["delay"]
-
-  // Observed attributes
-  /** Default delay in ms between frames. This is linked to a HTML attribute of the same name. @see {@link keyframe} */
-  delay: number = 1000
-  //
-
   private canvas: HTMLCanvasElement
-  private rootPane: Pane | null = null
-
-  private readonly modelConstructors: { [key: string]: () => Model } = {}
 
 
-  constructor() {
+  public constructor() {
     super()
-
-    // Register built-in models
-    this.registerModel('code', () => new Models.Code())
-    this.registerModel('graph', () => new Models.Graph())
 
     // Create shadow canvas
     const shadow = this.attachShadow({ 'mode': 'closed' })
-    this.canvas = document.createElement('canvas')
-    this.canvas.width = 640
-    this.canvas.height = 480
+    this.canvas = this.createCanvas()
     shadow.appendChild(this.canvas)
   }
 
 
-  protected connectedCallback() {
-    //console.log("Custom element added to page.")
+  createCanvas(): HTMLCanvasElement {
+    const canvas = document.createElement('canvas')
+    return canvas
   }
 
-  protected disconnectedCallback() {
-    //console.log("Custom element removed from page.")
+  public slideshow(func: SequenceFn): Promise<void> {
+    // TODO do something about concurrent runs
+    const seq = new Sequence(this.canvas)
+    return func(seq)
   }
 
-  protected connectedMoveCallback() {
-    //console.log("Custom element moved with moveBefore()")
-  }
+  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, options: Partial<GifOptions> = {}): Promise<Blob> {
+    const fullOptions: GifOptions = { ...DEFAULT_GIF_OPTIONS, ...options }
 
-  protected adoptedCallback() {
-    //console.log("Custom element moved to new page.")
-  }
+    const progress = {
+      setHidden(hidden: boolean) {
+        if(progressElement) progressElement.hidden = hidden
+      },
+      setMax(max: number) {
+        if(progressElement) progressElement.max = max
+      },
+      setValue(value: number | undefined) {
+        if(progressElement) {
+          if(value === undefined) {
+            progressElement.removeAttribute('value') // Make indeterminate
+          } else {
+            progressElement.value = value
+          }
+        }
+      },
+      animationFrame(): Promise<unknown> {
+        return new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+    }
 
-  protected attributeChangedCallback(name: any, _oldValue: any, newValue: any) {
-    //console.log(`Attribute ${name} has changed from ${oldValue} to ${newValue}.`)
-    switch(name) {
-      case 'delay':
-        this.delay = Number(newValue)
-        break
+    try {
+      // Capture frames
+      const gifCanvas = this.createCanvas()
+      const seq = new Sequence(gifCanvas, true)
+      const frames: {
+        image: ImageData,
+        delay: number
+      }[] = []
+      seq.addImageDataConsumer(function(frame: Frame) {
+        frames.push({
+          image: frame.imageData,
+          delay: frame.delayMs * 0.1 // 1 gif delay is 10 ms.
+        })
+      })
+
+      progress.setHidden(false)
+      progress.setValue(undefined) // To avoid having to solve the halting problem, set the progress bar to indeterminate
+      await progress.animationFrame()
+
+      await func(seq)
+
+      progress.setValue(0)
+      progress.setMax(1)
+      await progress.animationFrame()
+
+      // Make the GIF
+      // TODO loop
+      const gif = new Gif(gifCanvas.width, gifCanvas.height)
+
+      gif.globalColorTable = undefined
+      // FIXME color matching takes quite a while with a large color table
+
+      const reducer = new ColorReducers.Tiered([
+        {
+          limit: 256,
+          reducer: new ColorReducers.Random()
+        },
+        {
+          limit: Infinity,
+          reducer: function() {
+            const b = new ColorReducers.Bit()
+            b.mode = 'undershoot'
+            return b
+          }()
+        }
+      ])
+
+      for(let i = 0; i < frames.length; i++) {
+        const frame = frames[i]
+
+        const control = new GraphicControl()
+        control.delay = frame.delay
+        gif.blocks.push(control)
+
+        // TODO globalable table
+        const localTable = ColorTable.createQuantized(reducer, fullOptions.bitDepth - 1, frame.image)
+        const image = Image.fromCanvasImageData(frame.image, localTable)
+        image.tableIsLocal = true
+        //image.compressionFn = stupidCompress // HACK
+        gif.blocks.push(image)
+
+        progress.setValue((i + 1) / frames.length * 0.5)
+        await progress.animationFrame()
+      }
+
+      const vec = new ByteVector(options.encodingBufferSize)
+      const steps = gif.createFileStaged()
+      for(let i = 0; i < steps.length; i++) {
+        steps[i](vec)
+        progress.setValue(0.5 + (i + 1) / steps.length * 0.5)
+        await progress.animationFrame()
+      }
+
+      return new Blob(vec.finish())
+    } finally {
+      progress.setHidden(true)
+      await progress.animationFrame()
     }
   }
 
-  private redraw() {
-    console.log('Redraw called')
-
-    const CONTEXT_ID = '2d'
-
-    // If you're changing this to re-use the context between frames, keep in mind that Drawer.drawFreeform allows the user to mess up the drawing state stack.
-    const ctx = this.canvas.getContext(CONTEXT_ID)
-    if(ctx === null) throw new ReferenceError(`Canvas context '${CONTEXT_ID}' not supported or the canvas has already been set to a different mode.`)
-
-    const fullRegion = new Region(Point(0, 0), Size(this.canvas.width, this.canvas.height))
-    const drawer = new Drawer(ctx, fullRegion, fullRegion)
-    drawer.fill("white");
-
-    if(this.rootPane !== null) {
-      this.rootPane.draw(drawer)
-    }
-  }
-
-
-  /** Animates a sequence on the element's canvas. The promise is resolved when the animation is over. */
-  public async slideshow(func: SequenceFn): Promise<void> {
-    await func(this)
-
-    return Promise.resolve()
-  }
-
-  /** This should be called in sequence functions to request a keyframe. @see {@link SequenceFn} */
-  public async keyframe(delayScale: number = 1) {
-    this.redraw()
-
-    delayScale = Math.max(0, delayScale)
-    return new Promise((resolve) => {
-      setTimeout(resolve, this.delay * delayScale)
-    })
-  }
-
-  /** Retrieves a list of all registered {@link Model}s' names. */
-  public getModelNames(): string[] {
-    const names = []
-    for(let key in this.modelConstructors) {
-      names.push(key)
-    }
-    return names
-  }
-
-  /** Registers a factory function as a {@link Model}. @see {@link createModel} */
-  public registerModel(name: string, ctor: () => Model) {
-    this.modelConstructors[name] = ctor
-  }
-
-  /** Instantiates a registered {@link Model} based on its name. @see {@link getModelNames} */
-  public createModel(name: string): Model {
-    return this.modelConstructors[name]()
-  }
-
-
-  private static layoutToPane(layout: Layout, depthLimit: number): Pane {
-    if(depthLimit <= 0) {
-      throw new Error('Depth limit reached while scanning layout.')
-    }
-
-    if(layout instanceof Model) {
-      const pane = new ModelPane()
-      pane.model = layout
-      return pane
-    } else if(layout.split === 'horizontal') {
-      const pane = new SplitPane()
-      pane.axis = layout.split
-      if(layout.ratio !== undefined) pane.ratio = layout.ratio
-      pane.first = layout.top !== undefined && layout.top !== null ? Algonim.layoutToPane(layout.top, depthLimit - 1) : null
-      pane.second = layout.bottom !== undefined && layout.bottom !== null ? Algonim.layoutToPane(layout.bottom, depthLimit - 1) : null
-      return pane
-    } else if(layout.split === 'vertical') {
-      const pane = new SplitPane()
-      pane.axis = layout.split
-      if(layout.ratio !== undefined) pane.ratio = layout.ratio
-      pane.first = layout.left !== undefined && layout.left !== null ? Algonim.layoutToPane(layout.left, depthLimit - 1) : null
-      pane.second = layout.right !== undefined && layout.right !== null ? Algonim.layoutToPane(layout.right, depthLimit - 1) : null
-      return pane
-    } else {
-      throw new TypeError('Invalid layout.')
-    }
-  }
-
-  /** Initializes the hierarchy of {@link Pane}s using the given layout. */
-  public setLayout(layout: Layout) {
-    this.rootPane = Algonim.layoutToPane(layout, 50)
-  }
-
-}
-
-/** Describes a {@link Pane} hierarchy. @see {@link Algonim.setLayout} */
-export type Layout = Model
-  | { 'split': 'horizontal', 'ratio': number | undefined, 'top': Layout | undefined, 'bottom': Layout | undefined }
-  | { 'split': 'vertical', 'ratio': number | undefined, 'left': Layout | undefined, 'right': Layout | undefined }
-
-/** A function that plays an animation sequence. @see {@link Algonim.slideshow} */
-export type SequenceFn = (alg: Algonim) => Promise<void>
-
-
-
-/**
-* Base class for panes displayable by Algonim.
-* @see {@link Layout}
-*/
-export abstract class Pane {
-  /** Draws the pane over the entire area of the given drawer. */
-  public abstract draw(drawer: Drawer): void
-}
-
-/**
-* Pane that displays a {@link Model}.
-*/
-export class ModelPane implements Pane {
-  public model: Model | null = null
-
-  public draw(drawer: Drawer) {
-    if(this.model !== null) {
-      this.model.draw(drawer)
-    }
-  }
-}
-
-/**
-* Pane that displays two other panes within itself. Be careful not to create an infinitely recursing hierarchy!
-*/
-export class SplitPane implements Pane {
-  /** Axis along which the plane is split. Mirrors vim's behavior, meaning the separator line's orientation will match that of the split. In other words, a vertical split positions the subpanes side-by-side. */
-  public axis: 'horizontal' | 'vertical' = 'horizontal'
-  /** Controls the proportions of the split. Values closer to 0 reduce the first pane's size, while values closer to 1 increase it. */
-  public ratio: number = 0.5
-
-  /** The left or top pane, depending on the split axis. @see {@link axis} */
-  public first: Pane | null = null
-  /** The right or bottom pane, depending on the split axis. @see {@link axis} */
-  public second: Pane | null = null
-
-
-  public draw(drawer: Drawer) {
-    let split
-    switch(this.axis) {
-      case 'horizontal': split = (r: Region, start: number, end: number) => r.hsplit(start, end); break
-      case 'vertical': split = (r: Region, start: number, end: number) => r.vsplit(start, end); break
-    }
-
-    if(this.first !== null) {
-      let subregion = split(drawer.getLocalRegion(), 0.0, this.ratio)
-      const firstDrawer = drawer.subregion(subregion)
-      this.first.draw(firstDrawer)
-    }
-    if(this.second !== null) {
-      let subregion = split(drawer.getLocalRegion(), this.ratio, 1.0)
-      const secondDrawer = drawer.subregion(subregion)
-      this.second.draw(secondDrawer)
-    }
-
-    // +0.5 seems to fix the line ending up between pixels.
-    switch(this.axis) {
-      case 'horizontal':
-        const y = Math.round(drawer.getLocalRegion().size.height * this.ratio) + 0.5
-        drawer.drawLine(Point(0, y), Point(drawer.getLocalRegion().size.width, y), { stroke: 'black' })
-        break
-      case 'vertical':
-        const x = Math.round(drawer.getLocalRegion().size.width * this.ratio) + 0.5
-        drawer.drawLine(Point(x, 0), Point(x, drawer.getLocalRegion().size.height), { stroke: 'black' })
-        break
-    }
-  }
 }
 
 

@@ -5,11 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Algonim</title>
     <script src="dist/Algonim.js"></script>
+    <script>
+      function downloadBlob(blob) {
+        window.open(URL.createObjectURL(blob))
+      }
+    </script>
   </head>
   <body>
-    <div style="margin: 0; padding: 0; width: 100%; height: 100vh;">
-      <algonim-element delay=1000></algonim-element><br>
+
+    <div style="min-height: 100vh; margin-right: 8px;">
+      <algonim-element></algonim-element><br>
+      <div style="width: 100%; display: flex; flex-direction: row;">
+        <textarea id="script-area" style="width: 40vw; height: 30em; margin-bottom: -3px;">textarea</textarea>
+        <div style="flex-grow: 1;">
+          <iframe style="width: 100%; height: 100%;" src="./docs/index.html"></iframe>
+        </div>
+      </div>
       <div>
+        <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
+        <button onclick="document.getElementById('script-area').textContent = animationFunc"></button>
+        <progress id="gif-progress" hidden="true"></progress>
         <a href="./docs/index.html">docs</a>
       </div>
     </div>
@@ -23,8 +38,10 @@
     <script defer="defer">
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
-      algonim.slideshow(async (alg) => {
-        const code = alg.createModel('code')
+      const animationFunc = async (seq) => {
+        seq.config.resolution = { width: 640, height: 480 }
+
+        const code = seq.createModel('code')
         code.setLines([
           'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
           'while i>0 do',
@@ -33,13 +50,13 @@
           'done'
         ])
 
-        const fakeConsole = alg.createModel('code')
+        const fakeConsole = seq.createModel('code')
         fakeConsole.numberingStyleOverride = null
         fakeConsole.numberSeparatorStyle = null
         const outputLines = [ 'Output: (totally not a CodeModel)' ]
         fakeConsole.setLines(outputLines)
 
-        const graph = alg.createModel('graph')
+        const graph = seq.createModel('graph')
         let node = graph.createNode()
         node.position.x = 48
         node.position.y = 48
@@ -70,42 +87,50 @@
 
         code.arrowLines = 0
 
-        alg.setLayout(layout)
+        seq.setLayout(layout)
 
-        await alg.keyframe()
+        await seq.capture()
 
         let i = 3
         const iSign = code.createSign(0)
         iSign.text = `${i}`
 
         code.arrowLines = 1
-        await alg.keyframe()
+        await seq.capture()
         while(i > 0) {
           code.arrowLines = 2
-          await alg.keyframe()
+          await seq.capture()
           outputLines.push(`${i}`)
           fakeConsole.setLines(outputLines)
-          await alg.keyframe()
+          await seq.capture()
           i -= 1
           iSign.text = `${i}`
           code.arrowLines = 3
-          await alg.keyframe()
+          await seq.capture()
           code.arrowLines = 1
-          await alg.keyframe()
+          await seq.capture()
         }
         code.arrowLines = 4
-        await alg.keyframe()
+        await seq.capture()
 
         code.arrowLines = null
-        await alg.keyframe()
+        await seq.capture()
 
         iSign.destroy()
         code.createSign(4).text = 'Fin.'
-        await alg.keyframe()
-      })
+        await seq.capture()
+      }
 
-      //alg.setupExample()
-      //alg.redraw()
+      const rainbowFunc = async function(seq) {
+        seq.config.resolution = { width: 512, height: 256 }
+        const rainbow = seq.createModel('rainbow')
+        rainbow.step = { x: 2, y: 2 }
+        seq.setLayout(rainbow)
+        await seq.capture()
+      }
+
+      const chosenFunc = rainbowFunc
+      algonim.slideshow(chosenFunc)
     </script>
   </body>
 </html>

@@ -242,34 +242,46 @@ export class Drawer {
   }
 
 
-  /** Draws an ellipse. @see [CanvasRenderingContext2D.ellipse](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse) */
-  public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
+  private drawPath(pathFn: (ctx: CanvasRenderingContext2D) => void, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null) {
     this.doClipped(() => {
-
-      const effectiveExtras: EllipseExtras = { ...{
-          rotation: 0,
-          startAngle: 0,
-          endAngle: Math.PI * 2,
-          counterclockwise: false
-        }, ...extras }
-
-      const ellipse = function(ctx: CanvasRenderingContext2D) {
-        ctx.ellipse(center.x, center.y, size.width / 2, size.height / 2, effectiveExtras.rotation, effectiveExtras.startAngle, effectiveExtras.endAngle, effectiveExtras.counterclockwise)
-      }
-
       if(fillStyle != null) {
         this.applyFillStyle(fillStyle)
         this.context.beginPath()
-        ellipse(this.context)
+        pathFn(this.context)
         this.context.fill()
       }
       if(lineStyle != null) {
         this.applyLineStyle(lineStyle)
         this.context.beginPath()
-        ellipse(this.context)
+        pathFn(this.context)
         this.context.stroke()
       }
     })
+  }
+
+  /** Draws an ellipse. @see [CanvasRenderingContext2D.ellipse](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse) */
+  public drawEllipse(center: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null, extras: Partial<EllipseExtras> = {}) {
+    const effectiveExtras: EllipseExtras = { ...{
+        rotation: 0,
+        startAngle: 0,
+        endAngle: Math.PI * 2,
+        counterclockwise: false
+      }, ...extras }
+
+    const ellipse = function(ctx: CanvasRenderingContext2D) {
+      ctx.ellipse(center.x, center.y, size.width / 2, size.height / 2, effectiveExtras.rotation, effectiveExtras.startAngle, effectiveExtras.endAngle, effectiveExtras.counterclockwise)
+    }
+
+    this.drawPath(ellipse, lineStyle, fillStyle)
+  }
+
+  /** Draws a rectangle specified by its top left corner and size. */
+  public drawRectangle(topLeft: Point, size: Size, lineStyle: Partial<LineStyle> | null = {}, fillStyle: DrawStyle | null = null) {
+    const rect = (ctx: CanvasRenderingContext2D) => {
+      ctx.rect(topLeft.x, topLeft.y, size.width, size.height)
+    }
+
+    this.drawPath(rect, lineStyle, fillStyle)
   }
 
 
@@ -317,6 +329,12 @@ export class Drawer {
     }, true) // Skip the origin offset for this
   }
 
+
+  /** [getImageData](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/getImageData), but only within the clipping region of this drawer. */
+  public getImageData(settings?: ImageDataSettings): ImageData {
+    return this.context.getImageData(this.clipRegion.origin.x, this.clipRegion.origin.y, this.clipRegion.size.width, this.clipRegion.size.height, settings)
+  }
+
   /**
   * Escape hatch that gives you direct access to the underlying [CanvasRenderingContext2D](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D).
   *
@@ -327,5 +345,8 @@ export class Drawer {
       fn(this.context)
     })
   }
+
+  /** Gets the underlying canvas rendering context. Prefer not using this, since it defeats the whole purpose of being able to draw with styles and clipping. Here be dragons! */
+  public getRawContext(): CanvasRenderingContext2D { return this.context }
 
 }

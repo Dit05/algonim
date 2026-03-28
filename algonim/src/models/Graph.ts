@@ -31,7 +31,7 @@ export class Edge {
     const index = array.indexOf(this)
 
     if(CONFIG.CONSISTENCY_CHECKS && array.indexOf(this) !== -1) {
-      CONFIG.warnInconsistency('GraphModel Edge being linked multiple times to the same Node')
+      CONFIG.warnInconsistency("GraphModel Edge being linked multiple times to the same Node")
     }
 
     if(index !== -1) return // Already present, don't do anything
@@ -48,7 +48,7 @@ export class Edge {
     array.splice(index, 1)
 
     if(CONFIG.CONSISTENCY_CHECKS && array.indexOf(this) !== -1) {
-      CONFIG.warnInconsistency('GraphModel Edge still in array after being unlinked')
+      CONFIG.warnInconsistency("GraphModel Edge still in array after being unlinked")
     }
 
     return true
@@ -57,14 +57,14 @@ export class Edge {
   private checkInvariants() {
     if(!CONFIG.CONSISTENCY_CHECKS) return
 
-    if(this.source.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in outgoing array of source')
-    if(this.destination.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge not in incoming array of destination')
+    if(this.source.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge not in outgoing array of source")
+    if(this.destination.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge not in incoming array of destination")
     if(this.bidirectional) {
-      if(this.source.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in incoming array of source')
-      if(this.destination.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency('GraphModel Edge (bidirectional) not in outgoing array of destination')
+      if(this.source.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge (bidirectional) not in incoming array of source")
+      if(this.destination.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge (bidirectional) not in outgoing array of destination")
     } else {
-      if(this.source.getRawArray('incoming').indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in incoming array of source')
-      if(this.destination.getRawArray('outgoing').indexOf(this) !== -1) CONFIG.warnInconsistency('GraphModel Edge (unidirectional) is in outgoing array of destination')
+      if(this.source.getRawArray('incoming').indexOf(this) !== -1) CONFIG.warnInconsistency("GraphModel Edge (unidirectional) is in incoming array of source")
+      if(this.destination.getRawArray('outgoing').indexOf(this) !== -1) CONFIG.warnInconsistency("GraphModel Edge (unidirectional) is in outgoing array of destination")
     }
   }
 
