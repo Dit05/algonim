@@ -2,6 +2,17 @@ import { ByteVector } from './ByteVector'
 import { ColorTable } from './ColorTable'
 
 
+/** Returns `charCodeAt(0) & 0xff`. */
+export function toByte(str: string) { return str.charCodeAt(0) & 0xff }
+/** Template tag version of {@link toByte}. */
+export const b = ([c]: TemplateStringsArray): number => c.charCodeAt(0)
+
+/** Returns `charCodeAt(0) & 0x7f`, which allows only ASCII characters. */
+export function toAscii(str: string) { return str.charCodeAt(0) & 0x7f }
+/** Template tag version of {@link toAscii}. */
+export const a = ([c]: TemplateStringsArray): number => c.charCodeAt(0) & 0x7f
+
+
 export interface Block {
   emit(vec: ByteVector): void
   /** Notice that this method returns any potential errors, rather than throwing them. */

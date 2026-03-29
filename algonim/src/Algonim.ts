@@ -1,6 +1,7 @@
 import { Gif } from '@/gif/Gif'
 import { ColorTable } from '@/gif/ColorTable'
 import { Image } from '@/gif/blocks/Image'
+import { Netscape2 } from '@/gif/blocks/extensions/Netscape2'
 import { GraphicControl } from '@/gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence, Frame } from '@/Sequence'
@@ -13,19 +14,22 @@ import * as GIFTESTS from '@/gif/Tests'
 
 export type GifOptions = {
   /** The value of {@link Algonim/gif/ColorTable!ColorTable.sizefield} will be one less than this. */
-  bitDepth: number,
+  colorTableBits: number,
+  /** Whether to automatically use color tables smaller than {@link colorTableBits} when possible. */
+  allowSmallerTables: boolean,
   /** Whether to use a new color table for every image instead of using a single global color table. */
   useLocalColorTables: boolean, // TODO
-  /** Whether the animation should repeat. */
-  looping: boolean, // TODO
+  /** Number of times the animation should loop, from `0` (infinite) up to `65535`. `Infinity` is treated as 0 and `NaN` is treated as `1`. If left `undefined`, no Netscape 2.0 block will be added to the GIF and looping will be unspecified. */
+  loopCount: number | undefined,
   /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
   encodingBufferSize: number
 }
 
 const DEFAULT_GIF_OPTIONS: GifOptions = {
-  bitDepth: 3,
+  colorTableBits: 8,
+  allowSmallerTables: true,
   useLocalColorTables: false,
-  looping: true,
+  loopCount: undefined,
   encodingBufferSize: 1024
 }
 
@@ -113,7 +117,6 @@ export class Algonim extends HTMLElement {
       const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
       gif.globalColorTable = undefined
-      // FIXME color matching takes quite a while with a large color table
 
       const reducer = new ColorReducers.Tiered([
         {
@@ -130,6 +133,19 @@ export class Algonim extends HTMLElement {
         }
       ])
 
+      let loops = options.loopCount
+      if(loops != undefined) {
+        if(isNaN(loops)) {
+          loops = 1
+        } else if(!isFinite(loops)) {
+          loops = 0
+        }
+
+        const loopBlock = new Netscape2()
+        loopBlock.loopCount = loops
+        gif.blocks.push(loopBlock)
+      }
+
       for(let i = 0; i < frames.length; i++) {
         const frame = frames[i]
 
@@ -139,7 +155,7 @@ export class Algonim extends HTMLElement {
 
         // TODO globalable table
         // TODO checkbox for allowing smaller sizefield
-        const localTable = ColorTable.createQuantized(reducer, fullOptions.bitDepth - 1, frame.image, true)
+        const localTable = ColorTable.createQuantized(reducer, fullOptions.colorTableBits - 1, frame.image, true)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         //image.compressionFn = stupidCompress // HACK

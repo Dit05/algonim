@@ -18,3 +18,11 @@ export function makeIterable<T>(obj: CouldBeIterable<T>): Iterable<T> {
     }() // Genuis! Construct a generator function, then immediately invoke it.
   }
 }
+
+export function iterateDataViewBytes(dataView: DataView): Iterable<number> {
+  return function*() {
+    for(let i = 0; i < dataView.byteLength; i++) {
+      yield dataView.getUint8(i)
+    }
+  }()
+}
