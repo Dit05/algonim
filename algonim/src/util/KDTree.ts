@@ -1,6 +1,6 @@
 
 
-type Leaf = { parent: Node | undefined, point: number[] }
+type Leaf = { parent: Node | undefined, point: number[], index: number }
 type Branch = {
   parent: Node | undefined,
   splitValue: number,
@@ -68,16 +68,21 @@ export class KDTree {
     if(dimensions === undefined) throw new RangeError("Input sequence contains no points.")
     this.dimensions = dimensions
 
+    const allIndices = new Array(allPoints.length)
+    for(let i = 0; i < allPoints.length; i++) {
+      allIndices[i] = i
+    }
+
 
     let root: undefined | PartialNode = undefined
 
     const stack: {
-      points: number[][],
+      indices: number[],
       splitAxis: number,
       parent: { branch: PartialBranch, high: boolean } | undefined
     }[] = []
     stack.push({
-      points: allPoints,
+      indices: allIndices,
       splitAxis: 0,
       parent: undefined
     })
@@ -87,20 +92,22 @@ export class KDTree {
       if(elem === undefined) break
 
       let newNode: PartialNode
-      if(elem.points.length < 1) {
+      if(elem.indices.length < 1) {
         throw new Error("This should never happen.")
-      } else if(elem.points.length === 1) {
+      } else if(elem.indices.length === 1) {
         // Leaf
-        newNode = { parent: undefined, point: elem.points[0] }
+        newNode = { parent: undefined, point: allPoints[elem.indices[0]], index: elem.indices[0] }
       } else {
         // Branch
-        elem.points.sort((a, b) => {
-          return a[elem.splitAxis] - b[elem.splitAxis]
+        elem.indices.sort((a, b) => {
+          return allPoints[a][elem.splitAxis] - allPoints[b][elem.splitAxis]
         })
 
         // This should be the median point.
-        const midIndex = Math.floor(elem.points.length / 2)
-        const splitValue = (elem.points[midIndex - 1][elem.splitAxis] + elem.points[midIndex][elem.splitAxis]) / 2
+        const midIndex = Math.floor(elem.indices.length / 2)
+        const midValueLow = allPoints[elem.indices[midIndex - 1]][elem.splitAxis]
+        const midValueHigh = allPoints[elem.indices[midIndex]][elem.splitAxis]
+        const splitValue = (midValueLow + midValueHigh) / 2
 
         newNode = {
           parent: undefined,
@@ -111,12 +118,12 @@ export class KDTree {
         }
 
         stack.push({
-          points: elem.points.slice(0, midIndex),
+          indices: elem.indices.slice(0, midIndex),
           splitAxis: (elem.splitAxis + 1) % dimensions,
           parent: { branch: newNode, high: false }
         })
         stack.push({
-          points: elem.points.slice(midIndex),
+          indices: elem.indices.slice(midIndex),
           splitAxis: (elem.splitAxis + 1) % dimensions,
           parent: { branch: newNode, high: true }
         })
@@ -158,7 +165,7 @@ export class KDTree {
   }
 
 
-  private findBestInNode(target: ArrayLike<number>, searchRoot: Node, best: [{ point: ArrayLike<number>, distanceSq: number } | undefined]) {
+  private findBestInNode(target: ArrayLike<number>, searchRoot: Node, best: [{ point: ArrayLike<number>, index: number, distanceSq: number } | undefined]) {
     let current: Node = searchRoot
     while('splitValue' in current) {
       if(target[current.splitAxis] < current.splitValue) {
@@ -177,10 +184,12 @@ export class KDTree {
     if(best[0] === undefined) {
       best[0] = {
         point: current.point,
+        index: current.index,
         distanceSq: distanceSq
       }
     } else if(distanceSq < best[0].distanceSq) {
       best[0].point = current.point
+      best[0].index = current.index
       best[0].distanceSq = distanceSq
     }
 
@@ -207,13 +216,14 @@ export class KDTree {
   }
 
   /** Given some target position, returns the nearest contained point to it. */
-  public findNearest(target: ArrayLike<number>): { point: ArrayLike<number>, distance: number } {
+  public findNearest(target: ArrayLike<number>): { point: ArrayLike<number>, index: number, distance: number } {
     if(target.length < this.dimensions) throw new RangeError("Target point has less dimensions than this tree.")
-    const best: [{ point: ArrayLike<number>, distanceSq: number } | undefined] = [undefined]
+    const best: [{ point: ArrayLike<number>, index: number, distanceSq: number } | undefined] = [undefined]
     this.findBestInNode(target, this.root, best)
     if(best[0] === undefined) throw new Error("No closest point found. This should never happen.")
     return {
       point: best[0].point,
+      index: best[0].index,
       distance: Math.sqrt(best[0].distanceSq)
     }
   }

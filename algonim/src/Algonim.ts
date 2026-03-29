@@ -138,7 +138,8 @@ export class Algonim extends HTMLElement {
         gif.blocks.push(control)
 
         // TODO globalable table
-        const localTable = ColorTable.createQuantized(reducer, fullOptions.bitDepth - 1, frame.image)
+        // TODO checkbox for allowing smaller sizefield
+        const localTable = ColorTable.createQuantized(reducer, fullOptions.bitDepth - 1, frame.image, true)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         //image.compressionFn = stupidCompress // HACK

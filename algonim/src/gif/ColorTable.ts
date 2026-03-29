@@ -1,16 +1,9 @@
 import { ByteVector } from './ByteVector'
 import { Color, ColorUtil } from './Color'
 import { ColorReducer, ColorArrays, toCounted } from './ColorReducer'
+import { CouldBeIterable } from '@/util/TypeAdapters'
+import { KDTree } from '@/util/KDTree'
 
-
-export type LossArguments = {
-  fromColor: Color,
-  fromPopulation: number,
-  toColor: Color,
-  toPopulation: number
-}
-export type LossFn = (args: LossArguments) => number
-export type DistanceFn = (from: Color, to: Color) => number
 
 export class ColorTable {
 
@@ -24,23 +17,49 @@ export class ColorTable {
   /** Whether colors are sorted in order of decreasing importance. */
   public ordered: boolean = false
 
+  private searchTree: KDTree | undefined = undefined
+
 
   public constructor(sizefield: number) {
     this.sizefield = sizefield
-    this.colors = new Uint32Array(ColorTable.sizefieldToSize(sizefield))
+
+    const colorTable = this
+    this.colors = new Proxy(new Uint32Array(ColorTable.sizefieldToSize(sizefield)), {
+      get(target, prop: string | symbol, _receiver: any) {
+        const value = Reflect.get(target, prop, target)
+        if (typeof value === 'function') {
+          return value.bind(target)
+        }
+        return value
+      },
+      set(target, prop: string | symbol, value: any, receiver: any) {
+        // Invalidate the search tree whenever colors are modified
+        colorTable.searchTree = undefined
+        return Reflect.set(target, prop, value, receiver)
+      }
+    })
   }
 
-  public static createQuantized(reducer: ColorReducer, sizefield: number, input: ColorArrays | ImageData): ColorTable {
-    const table = new ColorTable(sizefield)
-
+  public static createQuantized(reducer: ColorReducer, sizefield: number, colors: ColorArrays | CouldBeIterable<Color> | ImageData, allowSmallerSizefield: boolean = false): ColorTable {
     // Type narrowing my beloved
-    if(input instanceof ImageData) {
-      input = toCounted(ColorUtil.imageDataToColors(input))
+    if(colors instanceof ImageData) {
+      colors = ColorUtil.imageDataToColors(colors)
     }
 
-    const reduced: ColorArrays = reducer.reduce(input, ColorTable.sizefieldToSize(sizefield))
+    let arrays: ColorArrays = ('colors' in colors && 'counts' in colors)
+      ? colors
+      : toCounted(colors)
+
+    if(allowSmallerSizefield) {
+      sizefield = ColorTable.desiredSizeToSizefield(arrays.colors.length) ?? ColorTable.MAX_SIZEFIELD
+    }
+    const table = new ColorTable(sizefield)
+
+    if(arrays.colors.length > table.colors.length) {
+      arrays = reducer.reduce(arrays, table.colors.length)
+    }
     for(let i = 0; i < table.colors.length; i++) {
-      table.colors[i] = reduced.colors[i]
+      table.colors[i] = arrays.colors[i]
     }
 
     return table
@@ -105,37 +124,26 @@ export class ColorTable {
 
 
   /** Gets the index of the color that has the lowest distance to the target. */
-  public getClosestColorIndex(target: Color, distanceFn: DistanceFn = ColorTable.defaultDistanceFn): number {
-    let bestIndex = 0
-    let bestMetric = Infinity
-
-    for(let i = 0; i < this.colors.length; i++) {
-      const metric = distanceFn(this.colors[i], target)
-      if(metric < bestMetric) {
-        bestIndex = i
-        bestMetric = metric
-      }
+  public getClosestColorIndex(target: Color): number {
+    function colorToPoint(color: Color): [number, number, number] {
+      return [ColorUtil.getRed(color), ColorUtil.getGreen(color), ColorUtil.getBlue(color)]
     }
 
-    return bestIndex
-  }
+    if(this.searchTree === undefined) {
+      const colorTable = this
+      this.searchTree = new KDTree(function*() {
+        for(const color of colorTable.colors) {
+          yield colorToPoint(color)
+        }
+      }())
+    }
 
-  /** Default implementation of {@link LossFn}. Multiplies the distance by fromPopulation. */
-  public static defaultLossFn(args: LossArguments, distanceFn: DistanceFn = ColorTable.defaultDistanceFn): number {
-    return distanceFn(args.fromColor, args.toColor) * args.fromPopulation
-  }
-
-  /** Default implementation of {@link DistanceFn}. Calculates the sum of squared error per component. */
-  public static defaultDistanceFn(from: Color, to: Color): number {
-    function square(x: number) { return x*x }
-    let difference = 0
-    difference += square(ColorUtil.getRed(to) - ColorUtil.getRed(from))
-    difference += square(ColorUtil.getGreen(to) - ColorUtil.getGreen(from))
-    difference += square(ColorUtil.getBlue(to) - ColorUtil.getBlue(from))
-    return difference
+    const nearest = this.searchTree.findNearest(colorToPoint(target))
+    return nearest.index
   }
 
 
+  /** Emits this table's color data. */
   public emit(vec: ByteVector) {
     for(const color of this.colors) {
       vec.addUint8(ColorUtil.getRed(color))
