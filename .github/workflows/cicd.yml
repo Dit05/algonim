@@ -56,6 +56,7 @@ jobs:
         cp -r algonim/dist ./page/
         cp -r algonim/docs ./page/
         cp ./algonim/index.html ./page/index.html
+        cp ./algonim/script.js ./page/script.js
 
     - name: Upload artifact
       if: matrix.node-version == '22.x' && github.event_name == 'push'

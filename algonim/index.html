@@ -5,36 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Algonim</title>
     <script src="dist/Algonim.js"></script>
-    <script>
-      function downloadBlob(blob) {
-        window.open(URL.createObjectURL(blob))
-      }
-      function makeGif() {
-        options = {
-          bitDepth: document.getElementById('gif-bitDepth').value
-        }
-        algonim.recordGif(chosenFunc, document.getElementById('gif-progress'), options)
-          .then(blob => downloadBlob(blob))
-      }
-    </script>
+    <script src="script.js"></script>
   </head>
   <body>
 
     <div style="min-height: 100vh; margin-right: 8px;">
-      <algonim-element></algonim-element><br>
       <div style="width: 100%; display: flex; flex-direction: row;">
-        <textarea id="script-area" style="width: 40vw; height: 30em; margin-bottom: -3px;">textarea</textarea>
+        <textarea id="script-area" style="width: 40vw; height: 30em; margin-bottom: -3px;"></textarea>
         <div style="flex-grow: 1;">
           <iframe style="width: 100%; height: 100%;" src="./docs/index.html"></iframe>
         </div>
       </div>
       <div>
-        <input id="gif-bitDepth" type="NUMBER" min="1" max="8"></input>
-        <button onclick="makeGif()">Click to make a GIF!</button>
-        <button onclick="document.getElementById('script-area').textContent = animationFunc"></button>
+        <!-- TODO eyeplain options -->
+        <input id="gif-tableBits" type="NUMBER" min="1" max="8" value="8"></input>
+        <input id="gif-allowSmallerTables" type="CHECKBOX" checked></input>
+        <input id="gif-loop" type="CHECKBOX" checked></input>
+        <button onclick="makeGif()">GIF</button>
+        <button onclick="slideshow()">Slideshow</button>
+        <select id="example-select"><option value=""></option></select>
+        <button id="example-load" onclick="loadExample(document.getElementById('example-select').value)">Load example</button>
         <progress id="gif-progress" hidden="true"></progress>
         <a href="./docs/index.html">docs</a>
       </div>
+
+      <br>
+      <algonim-element></algonim-element><br>
     </div>
 
     <footer>
@@ -46,136 +42,28 @@
     <script defer="defer">
       const algonim = document.getElementsByTagName('algonim-element')[0]
 
-      const animationFunc = async (seq) => {
-        seq.config.resolution = { width: 640, height: 480 }
-
-        const code = seq.createModel('code')
-        code.setLines([
-          'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
-          'while i>0 do',
-          '\tprint(i)',
-          '\ti <- i-1',
-          'done'
-        ])
-
-        const fakeConsole = seq.createModel('code')
-        fakeConsole.numberingStyleOverride = null
-        fakeConsole.numberSeparatorStyle = null
-        const outputLines = [ 'Output: (totally not a CodeModel)' ]
-        fakeConsole.setLines(outputLines)
-
-        const graph = seq.createModel('graph')
-        let node = graph.createNode()
-        node.position.x = 48
-        node.position.y = 48
-        node.value = 149
-
-        let node2 = graph.createNode()
-        node2.connect(node, false)
-        node2.position.x = 128
-        node2.position.y = 192
-
-        let node3 = graph.createNode()
-        node3.value = "lonely node"
-        node3.position.x = 180
-        node3.position.y = 450
-
-        graph.roots = [node, node3]
-
-        let layout = {
-          'split': 'vertical',
-          'ratio': 0.4,
-          'left': graph,
-          'right': {
-            'split': 'horizontal',
-            'top': code,
-            'bottom': fakeConsole
-          }
+      {
+        const exampleSelect = document.getElementById('example-select')
+        for(const key in examples) {
+          const option = document.createElement('option')
+          option.value = key
+          option.innerText = key
+          exampleSelect.appendChild(option)
         }
 
-        code.arrowLines = 0
-
-        seq.setLayout(layout)
-
-        await seq.capture()
-
-        let i = 3
-        const iSign = code.createSign(0)
-        iSign.text = `${i}`
-
-        code.arrowLines = 1
-        await seq.capture()
-        while(i > 0) {
-          code.arrowLines = 2
-          await seq.capture()
-          outputLines.push(`${i}`)
-          fakeConsole.setLines(outputLines)
-          await seq.capture()
-          i -= 1
-          iSign.text = `${i}`
-          code.arrowLines = 3
-          await seq.capture()
-          code.arrowLines = 1
-          await seq.capture()
+        const exampleLoad = document.getElementById('example-load')
+        function setButtonEnabledness() {
+          exampleLoad.disabled = !(exampleSelect.value in examples)
         }
-        code.arrowLines = 4
-        await seq.capture()
-
-        code.arrowLines = null
-        await seq.capture()
-
-        iSign.destroy()
-        code.createSign(4).text = 'Fin.'
-        await seq.capture()
+        exampleSelect.addEventListener('change', setButtonEnabledness)
+        setButtonEnabledness()
       }
 
-      const rainbowFunc = async function(seq) {
-        seq.config.resolution = { width: 512, height: 256 }
-        const rainbow = seq.createModel('rainbow')
-        rainbow.step = { x: 2, y: 2 }
-        seq.setLayout(rainbow)
-        await seq.capture()
+      const scriptArea = document.getElementById('script-area')
+      if(scriptArea.value === '') {
+        loadExample('complete example')
+        slideshow()
       }
-
-      const voronoiFunc = async function(seq) {
-        const COUNT = 64
-        const SPEED = 8
-        const FRAMES = 64
-
-        const points = new Array(COUNT)
-        for(let i = 0; i < points.length; i++) {
-          points[i] = {
-            x: Math.floor(Math.random() * seq.config.resolution.width),
-            y: Math.floor(Math.random() * seq.config.resolution.height),
-            vx: Math.floor((Math.random() - 0.5) * SPEED),
-            vy: Math.floor((Math.random() - 0.5) * SPEED),
-            color: Math.floor(Math.random() * 0xffffff)
-          }
-        }
-
-        seq.config.resolution = { width: 480, height: 272 }
-        const voronoi = seq.createModel('voronoi')
-        seq.setLayout(voronoi)
-        voronoi.step = { x: 2, y: 2 }
-
-        for(let j = 0; j < FRAMES; j++) {
-          voronoi.points.clear()
-          for(let i = 0; i < points.length; i++) {
-            const point = points[i]
-            voronoi.points.set({ x: point.x, y: point.y }, point.color)
-            point.x += point.vx
-            point.y += point.vy
-            if(point.x < 0 && point.vx < 0) point.vx *= -1
-            if(point.y < 0 && point.vy < 0) point.vy *= -1
-            if(point.x >= seq.config.resolution.width && point.vx > 0) point.vx *= -1
-            if(point.y >= seq.config.resolution.height && point.vy > 0) point.vy *= -1
-          }
-          await seq.capture(0.05)
-        }
-      }
-
-      const chosenFunc = voronoiFunc
-      algonim.slideshow(chosenFunc)
     </script>
   </body>
 </html>
