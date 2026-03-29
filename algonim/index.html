@@ -9,6 +9,13 @@
       function downloadBlob(blob) {
         window.open(URL.createObjectURL(blob))
       }
+      function makeGif() {
+        options = {
+          bitDepth: document.getElementById('gif-bitDepth').value
+        }
+        algonim.recordGif(chosenFunc, document.getElementById('gif-progress'), options)
+          .then(blob => downloadBlob(blob))
+      }
     </script>
   </head>
   <body>
@@ -22,7 +29,8 @@
         </div>
       </div>
       <div>
-        <button onclick="algonim.recordGif(chosenFunc, document.getElementById('gif-progress')).then(blob => downloadBlob(blob))">Click to make a GIF!</button>
+        <input id="gif-bitDepth" type="NUMBER" min="1" max="8"></input>
+        <button onclick="makeGif()">Click to make a GIF!</button>
         <button onclick="document.getElementById('script-area').textContent = animationFunc"></button>
         <progress id="gif-progress" hidden="true"></progress>
         <a href="./docs/index.html">docs</a>
@@ -129,7 +137,44 @@
         await seq.capture()
       }
 
-      const chosenFunc = rainbowFunc
+      const voronoiFunc = async function(seq) {
+        const COUNT = 64
+        const SPEED = 8
+        const FRAMES = 64
+
+        const points = new Array(COUNT)
+        for(let i = 0; i < points.length; i++) {
+          points[i] = {
+            x: Math.floor(Math.random() * seq.config.resolution.width),
+            y: Math.floor(Math.random() * seq.config.resolution.height),
+            vx: Math.floor((Math.random() - 0.5) * SPEED),
+            vy: Math.floor((Math.random() - 0.5) * SPEED),
+            color: Math.floor(Math.random() * 0xffffff)
+          }
+        }
+
+        seq.config.resolution = { width: 480, height: 272 }
+        const voronoi = seq.createModel('voronoi')
+        seq.setLayout(voronoi)
+        voronoi.step = { x: 2, y: 2 }
+
+        for(let j = 0; j < FRAMES; j++) {
+          voronoi.points.clear()
+          for(let i = 0; i < points.length; i++) {
+            const point = points[i]
+            voronoi.points.set({ x: point.x, y: point.y }, point.color)
+            point.x += point.vx
+            point.y += point.vy
+            if(point.x < 0 && point.vx < 0) point.vx *= -1
+            if(point.y < 0 && point.vy < 0) point.vy *= -1
+            if(point.x >= seq.config.resolution.width && point.vx > 0) point.vx *= -1
+            if(point.y >= seq.config.resolution.height && point.vy > 0) point.vy *= -1
+          }
+          await seq.capture(0.05)
+        }
+      }
+
+      const chosenFunc = voronoiFunc
       algonim.slideshow(chosenFunc)
     </script>
   </body>

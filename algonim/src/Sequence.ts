@@ -53,6 +53,7 @@ export class Sequence {
     this.registerModel('code', () => new Models.Code())
     this.registerModel('graph', () => new Models.Graph())
     this.registerModel('rainbow', () => new Models.Rainbow())
+    this.registerModel('voronoi', () => new Models.Voronoi())
   }
 
 
@@ -130,8 +131,13 @@ export class Sequence {
   }
 
   /** Instantiates a registered {@link Model} based on its name. @see {@link getModelNames} */
-  public createModel(name: string): Model {
-    return this.modelConstructors[name]()
+  public createModel(name: string): Model | undefined {
+    const ctor = this.modelConstructors[name]
+    if(ctor === undefined) {
+      return undefined
+    } else {
+      return ctor()
+    }
   }
 
   redraw(): Drawer {

@@ -4,6 +4,7 @@ type Leaf = { parent: Node | undefined, point: number[] }
 type Branch = {
   parent: Node | undefined,
   splitValue: number,
+  splitAxis: number,
   low: Node,
   high: Node
 }
@@ -12,6 +13,7 @@ type Node = Leaf | Branch
 type PartialBranch = {
   parent: Node | undefined,
   splitValue: number,
+  splitAxis: number,
   low: PartialNode | undefined,
   high: PartialNode | undefined
 }
@@ -26,6 +28,7 @@ function unpartial(partial: PartialNode): Node {
     return {
       parent: undefined,
       splitValue: partial.splitValue,
+      splitAxis: partial.splitAxis,
       low: unpartial(partial.low),
       high: unpartial(partial.high)
     }
@@ -97,11 +100,12 @@ export class KDTree {
 
         // This should be the median point.
         const midIndex = Math.floor(elem.points.length / 2)
-        const splitValue = (elem.points[midIndex][elem.splitAxis] + elem.points[midIndex + 1][elem.splitAxis]) / 2
+        const splitValue = (elem.points[midIndex - 1][elem.splitAxis] + elem.points[midIndex][elem.splitAxis]) / 2
 
         newNode = {
           parent: undefined,
           splitValue,
+          splitAxis: elem.splitAxis,
           low: undefined,
           high: undefined
         }
@@ -156,14 +160,12 @@ export class KDTree {
 
   private findBestInNode(target: ArrayLike<number>, searchRoot: Node, best: [{ point: ArrayLike<number>, distanceSq: number } | undefined]) {
     let current: Node = searchRoot
-    let splitAxis: number = 0
     while('splitValue' in current) {
-      if(target[splitAxis] < current.splitValue) {
+      if(target[current.splitAxis] < current.splitValue) {
         current = current.low
       } else {
         current = current.high
       }
-      splitAxis = (splitAxis + 1) % this.dimensions
     }
 
     let distanceSq = 0
@@ -185,17 +187,16 @@ export class KDTree {
     while(current !== searchRoot) {
       if(current.parent === undefined) throw new Error("This should never happen.")
       current = current.parent
-      splitAxis = (splitAxis > 0) ? splitAxis - 1 : this.dimensions - 1
 
       if('splitValue' in current) {
-        const pos = best[0].point[splitAxis]
-        let planeDifference = current.splitValue - pos // TODO plane
+        const pos = target[current.splitAxis]
+        let planeDifference = current.splitValue - pos
         if(planeDifference * planeDifference <= best[0].distanceSq) {
           let subRoot: Node
           if(pos < current.splitValue) {
-            subRoot = current.low
-          } else {
             subRoot = current.high
+          } else {
+            subRoot = current.low
           }
           this.findBestInNode(target, subRoot, best)
         }
