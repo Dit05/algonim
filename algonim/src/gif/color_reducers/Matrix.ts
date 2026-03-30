@@ -22,6 +22,7 @@ export class MatrixColorReducer extends ColorReducer {
   }
 
 
+
   /** Default implementation of {@link LossFn}. Multiplies the distance by fromPopulation. */
   public static defaultLossFn(args: LossArguments, distanceFn: DistanceFn = MatrixColorReducer.defaultDistanceFn): number {
     return distanceFn(args.fromColor, args.toColor) * args.fromPopulation

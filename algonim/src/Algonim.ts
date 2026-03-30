@@ -113,15 +113,14 @@ export class Algonim extends HTMLElement {
       await progress.animationFrame()
 
       // Make the GIF
-      // TODO loop
       const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
       gif.globalColorTable = undefined
 
-      const reducer = new ColorReducers.Tiered([
+      /*const reducer = new ColorReducers.Tiered([
         {
-          limit: 256,
-          reducer: new ColorReducers.Random()
+          limit: 1024,
+          reducer: new ColorReducers.Matrix()
         },
         {
           limit: Infinity,
@@ -131,8 +130,11 @@ export class Algonim extends HTMLElement {
             return b
           }()
         }
-      ])
+      ])*/
 
+      const reducer = new ColorReducers.NaiveMatrix() // HACK
+
+      // Add the Netscape 2.0 block if looping is specified
       let loops = options.loopCount
       if(loops != undefined) {
         if(isNaN(loops)) {
@@ -154,11 +156,9 @@ export class Algonim extends HTMLElement {
         gif.blocks.push(control)
 
         // TODO globalable table
-        // TODO checkbox for allowing smaller sizefield
-        const localTable = ColorTable.createQuantized(reducer, fullOptions.colorTableBits - 1, frame.image, true)
+        const localTable = ColorTable.createQuantized(reducer, fullOptions.colorTableBits - 1, frame.image, fullOptions.allowSmallerTables)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
-        //image.compressionFn = stupidCompress // HACK
         gif.blocks.push(image)
 
         progress.setValue((i + 1) / frames.length * 0.5)

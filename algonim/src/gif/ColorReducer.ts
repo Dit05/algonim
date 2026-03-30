@@ -15,14 +15,7 @@ export function checkInput(input: ColorArrays, targetSize: number | undefined = 
   if(targetSize !== undefined && targetSize > input.colors.length) throw new RangeError("targetSize must not exceed input array lengths.")
 }
 
-export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
-  colors = makeIterable(colors)
-  const map = new Map<number, number>()
-
-  for(const color of colors) {
-    map.set(color, (map.get(color) ?? 0) + 1)
-  }
-
+function mapToArrays(map: Map<Color, number>): ColorArrays {
   const arrays = {
     colors: new Array(map.size),
     counts: new Array(map.size)
@@ -38,6 +31,32 @@ export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
   CONFIG.consistencyShuffle(arrays.colors, arrays.counts)
 
   return arrays
+}
+
+export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
+  colors = makeIterable(colors)
+  const map = new Map<Color, number>()
+
+  for(const color of colors) {
+    map.set(color, (map.get(color) ?? 0) + 1)
+  }
+
+  return mapToArrays(map)
+}
+
+export function mergeCounteds(arrays: CouldBeIterable<ColorArrays>): ColorArrays {
+  arrays = makeIterable(arrays)
+  const map = new Map<Color, number>()
+
+  for(const array of arrays) {
+    checkInput(array)
+    for(let i = 0; i < array.colors.length; i++) {
+      const color = array.colors[i]
+      map.set(color, (map.get(color) ?? 0) + array.counts[i])
+    }
+  }
+
+  return mapToArrays(map)
 }
 
 
