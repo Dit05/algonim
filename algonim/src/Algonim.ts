@@ -117,10 +117,10 @@ export class Algonim extends HTMLElement {
 
       gif.globalColorTable = undefined
 
-      /*const reducer = new ColorReducers.Tiered([
+      const reducer = new ColorReducers.Tiered([
         {
           limit: 1024,
-          reducer: new ColorReducers.Matrix()
+          reducer: new ColorReducers.Random() //new ColorReducers.Matrix()
         },
         {
           limit: Infinity,
@@ -130,9 +130,9 @@ export class Algonim extends HTMLElement {
             return b
           }()
         }
-      ])*/
+      ])
 
-      const reducer = new ColorReducers.NaiveMatrix() // HACK
+      //const reducer = new ColorReducers.Matrix() // HACK
 
       // Add the Netscape 2.0 block if looping is specified
       let loops = options.loopCount
