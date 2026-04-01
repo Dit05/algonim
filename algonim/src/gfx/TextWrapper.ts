@@ -121,6 +121,7 @@ export class TextWrapper {
 
     while(text.length > 0) {
       const consumed = this.consumeLine(text, maxWidth, fullStyle)
+
       const line = []
 
       let width = 0
@@ -294,6 +295,7 @@ export class TextWrapper {
 
     while(true) {
       const nextPiece: TextPiece | ExplicitBreak | undefined = text.pop()
+      if(nextPiece === '') continue
       if(nextPiece === undefined || nextPiece === EXPLICIT_BREAK) break
 
       const size: Size = this.measure(nextPiece, style)

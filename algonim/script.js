@@ -37,11 +37,12 @@ function loadExample(name) {
 const examples = {
 
 'complete example': async (seq) => {
+  // An example showing off most features.
   seq.config.resolution = { width: 640, height: 480 }
 
   const code = seq.createModel('code')
   code.setLines([
-    'i <- 3 // very long long line break me please\n(this is still the same line, just manually broken)',
+    'i <- 3',
     'while i>0 do',
     '\tprint(i)',
     '\ti <- i-1',
@@ -120,6 +121,7 @@ const examples = {
 },
 
 rainbow: async function(seq) {
+  // Generates a single frame with lots of colors for quantization to deal with.
   seq.config.resolution = { width: 512, height: 256 }
   const rainbow = seq.createModel('rainbow')
   rainbow.step = { x: 2, y: 2 }
@@ -128,6 +130,7 @@ rainbow: async function(seq) {
 },
 
 voronoi: async function(seq) {
+  // Demonstrates the built-in Voronoi model that was used to test the k-d tree utilized by color tables.
   const COUNT = 64
   const SPEED = 8
   const FRAMES = 64
@@ -165,6 +168,7 @@ voronoi: async function(seq) {
 },
 
 'loop test': async function(seq) {
+  // Short animation with two frames to test looping.
   seq.config.resolution = { width: 128, height: 64 }
   seq.config.defaultDelayMs = 500 // Five. Hundred. Millisecs.
   const code = seq.createModel('code')
@@ -172,6 +176,20 @@ voronoi: async function(seq) {
   code.setLines(['a'])
   await seq.capture()
   code.setLines(['b'])
+  await seq.capture()
+},
+
+'text wrapping': async function(seq) {
+  // Shows CodeModel's automatic line wrapping.
+  seq.config.resolution = { width: 256, height: 512 }
+  const code = seq.createModel('code')
+  seq.setLayout(code)
+  code.setLines([
+    "Hello World!",
+    "This line is quite long, I sure hope it's all visible.",
+    "    This one is indented and long as well.",
+    "Manually\nbroken\nline"
+  ])
   await seq.capture()
 }
 
