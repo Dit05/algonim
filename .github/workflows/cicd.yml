@@ -32,7 +32,7 @@ jobs:
     - name: Install dependencies
       run: |
         cd algonim
-        npm install
+        npm ci --ignore-scripts
 
     - name: Compatibile licenses only
       run: |
