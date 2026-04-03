@@ -40,10 +40,11 @@ jobs:
         # license-checker isn't a dependency, so npx will ask to download it => --yes
         ./license-checker.sh --yes
 
-    - name: Build
+    - name: Build & Test
       run: |
         cd algonim
         npm run build
+        npm run test
 
     - name: Generate docs with TypeDoc
       run: |
