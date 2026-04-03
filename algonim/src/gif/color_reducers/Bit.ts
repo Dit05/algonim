@@ -41,8 +41,8 @@ export class BitColorReducer extends ColorReducer {
 
   public getBound(): ReductionBound {
     switch(this.mode) {
-      case 'overshoot': return 'lower'
-      case 'undershoot': return 'upper'
+      case 'overshoot': return 'upper'
+      case 'undershoot': return 'lower'
     }
   }
 
@@ -177,6 +177,7 @@ export class BitColorReducer extends ColorReducer {
         outputCounts[i] = kvp[1]
         i += 1
       }
+      if(i != best.map.size) throw new Error("This should never happen.")
 
       return {
         colors: outputColors,
