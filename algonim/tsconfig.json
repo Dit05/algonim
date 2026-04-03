@@ -20,7 +20,8 @@
     "src/**/*.ts"
   ],
   "exclude": [
-    "build/*"
+    "build/*",
+    "**/*.zests.ts"
   ],
   "outDir": "./build",
   "files": ["src/Algonim.ts"]
