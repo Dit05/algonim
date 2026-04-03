@@ -119,8 +119,8 @@ export class Algonim extends HTMLElement {
 
       const reducer = new ColorReducers.Tiered([
         {
-          limit: 1024,
-          reducer: new ColorReducers.Random() //new ColorReducers.Matrix()
+          limit: 2048,
+          reducer: new ColorReducers.Matrix()
         },
         {
           limit: Infinity,
@@ -131,8 +131,6 @@ export class Algonim extends HTMLElement {
           }()
         }
       ])
-
-      //const reducer = new ColorReducers.Matrix() // HACK
 
       // Add the Netscape 2.0 block if looping is specified
       let loops = options.loopCount

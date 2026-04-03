@@ -6,11 +6,20 @@ type Layer = {
   size: number
 }
 
-// OPTIMIZE:
-// - deletes: boolean[] instead of setting values to Infinity?
+/**
+* A square grid that optimizes finding the smallest element in it as values change.
+*
+* If you have mutated {@link data}, you must use either:
+* - {@link recomputeDirty} -- When only some data has changed and you've marked the changes as dirty.
+* - {@link recomputeAll} -- When all data has changed.
+*/
 export class MinimumGrid {
+  // OPTIMIZE:
+  // - deletes: boolean[] instead of setting values to Infinity?
 
+  /** Data stored in the grid, in a row-continuous fashion. After changing this, you must ensure the grid is properly recomputed before attempting to retrieve the minimum value. */
   public readonly data: Float64Array
+  /** Side length of the grid. */
   public readonly size: number
 
   readonly layers: Layer[] = []
@@ -19,6 +28,7 @@ export class MinimumGrid {
   readonly dirty: Set<number> = new Set()
 
 
+  /** Creates a {@link size}x{@link size} grid. */
   public constructor(size: number) {
     this.size = size
     this.data = new Float64Array(size * size)
@@ -65,40 +75,48 @@ export class MinimumGrid {
   }
 
 
+  /** Converts a column and a row into an index into {@link data}. */
   public index(col: number, row: number): number {
     return MinimumGrid.vIndex(this.size, col, row)
   }
 
+  /** Converts an index into {@link data} back into a column and a row. */
   public unindex(index: number): [number, number] {
     return MinimumGrid.vUnindex(this.size, index)
   }
 
+  /** Gets the index of the smallest element in {@link data}. This will only be definitely accurate if the grid has been properly recomputed since the last data change. */
   public getMinimumIndex(): number {
     return this.layers[this.layers.length - 1].indices[0]
   }
 
+  /** Gets the column and row of the smallest element in {@link data}. This will only be definitely accurate if the grid has been properly recomputed since the last data change. */
   public getMinimumCoord(): [number, number] {
     const index = this.getMinimumIndex()
     return [ index % this.size, Math.floor(index / this.size) ]
   }
 
 
-  public fillRow(row: number, value: number) {
-    this.data.fill(value, row * this.size, (row + 1) * this.size)
-  }
-
+  /** Fills an entire column with {@link value}. */
   public fillCol(col: number, value: number) {
     for(let i = 0; i < this.size; i++) {
       this.data[this.index(col, i)] = value
     }
   }
 
+  /** Fills an entire row with {@link value}. */
+  public fillRow(row: number, value: number) {
+    this.data.fill(value, row * this.size, (row + 1) * this.size)
+  }
 
+
+  /** Marks a cell to be affected by {@link recomputeDirty}. */
   public dirtyCell(col: number, row: number) {
     ;[col, row] = MinimumGrid.ascend(col, row)
     this.dirty.add(MinimumGrid.vIndex(this.layers[0].size, col, row))
   }
 
+  /** Marks a row of cells to be affected by {@link recomputeDirty}. Prefer using this over individual {@link dirtyCell} calls. */
   public dirtyRow(row: number) {
     row = MinimumGrid.ascend(0, row)[1]
     const size = this.layers[0].size
@@ -107,6 +125,7 @@ export class MinimumGrid {
     }
   }
 
+  /** Marks a column of cells to be affected by {@link recomputeDirty}. Prefer using this over individual {@link dirtyCell} calls. */
   public dirtyCol(col: number) {
     col = MinimumGrid.ascend(col, 0)[0]
     const size = this.layers[0].size
@@ -116,6 +135,7 @@ export class MinimumGrid {
   }
 
 
+  /** Recomputes every elements. Also marks everything clean. */
   public recomputeAll() {
     for(let l = 0; l < this.layers.length; l++) {
       const layer = this.layers[l]
@@ -125,9 +145,13 @@ export class MinimumGrid {
         }
       }
     }
+    this.dirty.clear()
   }
 
-  public recomputeDirty() {
+  /** Recomputes all elements that have been manually marked dirty so far, and marks them as clean. */
+  public recomputeDirty(): number {
+    let recomputed = 0
+
     let srcSet = this.dirty
     let destSet = new Set<number>()
 
@@ -138,6 +162,7 @@ export class MinimumGrid {
       for(const index of srcSet) {
         const [vCol, vRow] = MinimumGrid.vUnindex(layer.size, index)
         const changed: boolean = this.recomputeOne(l, vCol, vRow)
+        if(changed) recomputed += 1
 
         if(nextLayer !== undefined && changed) {
           const [c, r] = MinimumGrid.ascend(vCol, vRow)
@@ -153,6 +178,8 @@ export class MinimumGrid {
         [srcSet, destSet] = [destSet, srcSet]
       }
     }
+
+    return recomputed
   }
 
   private recomputeOne(layerNum: number, vCol: number, vRow: number): boolean {
@@ -180,7 +207,8 @@ export class MinimumGrid {
     const layer = this.layers[layerNum]
     const index = MinimumGrid.vIndex(layer.size, vCol, vRow)
 
-    const changed = (layer.values[index] !== minimumDataValue)
+    // For some reason, the index changing should count as a change too. Otherwise, MatrixColorReducer starts selecting Infinity cells and breaks.
+    const changed = (layer.indices[index] !== minimumDataIndex) || (layer.values[index] !== minimumDataValue)
     layer.indices[index] = minimumDataIndex
     layer.values[index] = minimumDataValue
     return changed
