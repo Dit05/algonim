@@ -3,14 +3,38 @@ function downloadBlob(blob) {
   window.open(URL.createObjectURL(blob))
 }
 
-function makeGif() {
-  options = {
-    colorTableBits: document.getElementById('gif-tableBits').value,
-    allowSmallerTables: document.getElementById('gif-allowSmallerTables').checked,
-    loopCount: document.getElementById('gif-allowSmallerTables').checked ? Infinity : NaN
+function showError(err) {
+  const div = document.getElementById('error-div')
+
+  if(err) {
+    console.error(err)
+    div.style.display = 'block'
+    div.children[0].innerText = err
+    if(err.lineNumber) {
+      const scriptArea = document.getElementById('script-area')
+      const text = scriptArea.value
+
+      let lines = err.lineNumber
+      let start = -1
+      let end = -1
+      while(lines --> 0) {
+        if(lines === 1) start = end + 1
+        end = text.indexOf('\n', end + 1)
+      }
+
+      scriptArea.focus()
+      scriptArea.setSelectionRange(start, end)
+    }
+  } else {
+    div.style.display = 'none'
   }
-  algonim.recordGif(getUserFunction(), document.getElementById('gif-progress'), options)
-    .then(blob => downloadBlob(blob))
+}
+
+function loadExample(name) {
+  document.getElementById('example-select').value = ''
+  if(name in examples) {
+    document.getElementById('script-area').value = String(examples[name]).replace('async function(seq)', 'async (seq) =>')
+  }
 }
 
 function getUserFunction() {
@@ -22,15 +46,31 @@ function getUserFunction() {
   return result
 }
 
-function slideshow() {
-  algonim.slideshow(getUserFunction())
+
+async function slideshow() {
+  showError(undefined)
+  try {
+    await algonim.slideshow(getUserFunction())
+  } catch(err) {
+    showError(err)
+  }
 }
 
-function loadExample(name) {
-  document.getElementById('example-select').value = ''
-  if(name in examples) {
-    document.getElementById('script-area').value = String(examples[name]).replace('async function(seq)', 'async (seq) =>')
+async function makeGif() {
+  showError(undefined)
+  options = {
+    colorTableBits: document.getElementById('gif-tableBits').value,
+    allowSmallerTables: document.getElementById('gif-allowSmallerTables').checked,
+    loopCount: document.getElementById('gif-allowSmallerTables').checked ? Infinity : NaN
   }
+
+  let blob = undefined
+  try {
+    blob = await algonim.recordGif(getUserFunction(), document.getElementById('gif-progress'), options)
+  } catch(err) {
+    showError(err)
+  }
+  if(blob) downloadBlob(blob)
 }
 
 
