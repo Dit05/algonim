@@ -1,16 +1,6 @@
 import { ColorReducer, ReductionBound, ColorArrays } from '../ColorReducer'
-import { Color } from '../Color'
 import { MatrixColorReducer } from './Matrix' // For distance and loss functions.
 
-
-export type LossArguments = {
-  fromColor: Color,
-  fromPopulation: number,
-  toColor: Color,
-  toPopulation: number
-}
-export type LossFn = (args: LossArguments) => number
-export type DistanceFn = (from: Color, to: Color) => number
 
 // 1540 -> 256 in 28.983913s
 // 6006 -> 256 in 1649.116315s (27 and a half minutes)
@@ -69,10 +59,10 @@ export class NaiveMatrixColorReducer extends ColorReducer {
           if(i == j) continue
           if(deletes[i]) continue
 
-          const lossHere = MatrixColorReducer.defaultLossFn({
+          const lossHere = MatrixColorReducer.lossFn({
               fromColor: input.colors[j], fromPopulation: counts[j],
               toColor: input.colors[i], toPopulation: counts[i]
-            }, MatrixColorReducer.defaultDistanceFn)
+            })
 
           if(lossHere < best.loss) {
             best.loss = lossHere

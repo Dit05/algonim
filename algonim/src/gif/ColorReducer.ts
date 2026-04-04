@@ -10,7 +10,7 @@ export type ColorArrays = {
   counts: ArrayLike<number>
 }
 
-export function checkInput(input: ColorArrays, targetSize: number | undefined = undefined) {
+export function checkArrays(input: ColorArrays, targetSize: number | undefined = undefined) {
   if(input.colors.length != input.counts.length) throw new RangeError("colors.length must equal counts.length.")
   if(targetSize !== undefined && targetSize > input.colors.length) throw new RangeError("targetSize must not exceed input array lengths.")
 }
@@ -49,7 +49,7 @@ export function mergeCounteds(arrays: CouldBeIterable<ColorArrays>): ColorArrays
   const map = new Map<Color, number>()
 
   for(const array of arrays) {
-    checkInput(array)
+    checkArrays(array)
     for(let i = 0; i < array.colors.length; i++) {
       const color = array.colors[i]
       map.set(color, (map.get(color) ?? 0) + array.counts[i])
@@ -80,12 +80,23 @@ export abstract class ColorReducer {
       }
     }
 
-    checkInput(input, targetSize)
-
+    checkArrays(input, targetSize)
     const preCounts = sumCounts(input.counts)
     const result = this._reduce(input, targetSize)
+    checkArrays(result)
     const postCounts = sumCounts(result.counts)
     if(postCounts != preCounts) CONFIG.warnInconsistency(`Sum of counts array must remain unchanged after reduction. (was ${preCounts}, became ${postCounts})`)
+
+    if(CONFIG.CONSISTENCY_CHECKS) {
+      const bound = this.getBound()
+      let bad = false
+      switch(bound) {
+        case 'upper': bad = result.colors.length > targetSize; break
+        case 'exact': bad = result.colors.length != targetSize; break
+        case 'lower': bad = result.colors.length < targetSize; break
+      }
+      if(bad) CONFIG.warnInconsistency(`Promised reduction bound was ${bound}, but when reducing to ${targetSize}, count went from ${input.colors.length} -> ${result.colors.length}.`);
+    }
 
     return result
   }

@@ -124,7 +124,7 @@ rainbow: async function(seq) {
   // Generates a single frame with lots of colors for quantization to deal with.
   seq.config.resolution = { width: 512, height: 256 }
   const rainbow = seq.createModel('rainbow')
-  rainbow.step = { x: 2, y: 2 }
+  rainbow.step = { x: 4, y: 4 }
   seq.setLayout(rainbow)
   await seq.capture()
 },
