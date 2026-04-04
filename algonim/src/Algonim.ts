@@ -22,7 +22,9 @@ export type GifOptions = {
   /** Number of times the animation should loop, from `0` (infinite) up to `65535`. `Infinity` is treated as 0 and `NaN` is treated as `1`. If left `undefined`, no Netscape 2.0 block will be added to the GIF and looping will be unspecified. */
   loopCount: number | undefined,
   /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
-  encodingBufferSize: number
+  encodingBufferSize: number,
+  /** Whether timing info should be logged to the console. */
+  logTiming: boolean
 }
 
 const DEFAULT_GIF_OPTIONS: GifOptions = {
@@ -30,7 +32,8 @@ const DEFAULT_GIF_OPTIONS: GifOptions = {
   allowSmallerTables: true,
   useLocalColorTables: false,
   loopCount: undefined,
-  encodingBufferSize: 1024
+  encodingBufferSize: 1024,
+  logTiming: true
 }
 
 
@@ -63,8 +66,8 @@ export class Algonim extends HTMLElement {
     return func(seq)
   }
 
-  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, options: Partial<GifOptions> = {}): Promise<Blob> {
-    const fullOptions: GifOptions = { ...DEFAULT_GIF_OPTIONS, ...options }
+  public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, optionsOverrides: Partial<GifOptions> = {}): Promise<Blob> {
+    const options: GifOptions = { ...DEFAULT_GIF_OPTIONS, ...optionsOverrides }
 
     const progress = {
       setHidden(hidden: boolean) {
@@ -87,7 +90,24 @@ export class Algonim extends HTMLElement {
       }
     }
 
+    function newTimer(): number {
+      return performance.now()
+    }
+    function measure(timer: number): number {
+      return performance.now() - timer
+    }
+
+    let totalTimer = newTimer()
+    let timer
+
     try {
+      const times: Partial<{
+        record: number,
+        frames: number[],
+        encode: number,
+        total: number
+      }> = {}
+
       // Capture frames
       const gifCanvas = this.createCanvas()
       const seq = new Sequence(gifCanvas, true)
@@ -106,7 +126,9 @@ export class Algonim extends HTMLElement {
       progress.setValue(undefined) // To avoid having to solve the halting problem, set the progress bar to indeterminate
       await progress.animationFrame()
 
+      timer = newTimer()
       await func(seq)
+      times.record = measure(timer)
 
       progress.setValue(0)
       progress.setMax(1)
@@ -133,7 +155,7 @@ export class Algonim extends HTMLElement {
       ])
 
       // Add the Netscape 2.0 block if looping is specified
-      let loops = options.loopCount
+      let loops = optionsOverrides.loopCount
       if(loops != undefined) {
         if(isNaN(loops)) {
           loops = 1
@@ -146,7 +168,9 @@ export class Algonim extends HTMLElement {
         gif.blocks.push(loopBlock)
       }
 
+      times.frames = new Array(frames.length)
       for(let i = 0; i < frames.length; i++) {
+        timer = newTimer()
         const frame = frames[i]
 
         const control = new GraphicControl()
@@ -154,21 +178,44 @@ export class Algonim extends HTMLElement {
         gif.blocks.push(control)
 
         // TODO globalable table
-        const localTable = ColorTable.createQuantized(reducer, fullOptions.colorTableBits - 1, frame.image, fullOptions.allowSmallerTables)
+        const localTable = ColorTable.createQuantized(reducer, options.colorTableBits - 1, frame.image, options.allowSmallerTables)
         const image = Image.fromCanvasImageData(frame.image, localTable)
         image.tableIsLocal = true
         gif.blocks.push(image)
+        times.frames[i] = measure(timer)
 
         progress.setValue((i + 1) / frames.length * 0.5)
         await progress.animationFrame()
       }
 
-      const vec = new ByteVector(options.encodingBufferSize)
+      timer = newTimer()
+      const vec = new ByteVector(optionsOverrides.encodingBufferSize)
       const steps = gif.createFileStaged()
       for(let i = 0; i < steps.length; i++) {
         steps[i](vec)
         progress.setValue(0.5 + (i + 1) / steps.length * 0.5)
         await progress.animationFrame()
+      }
+      times.encode = measure(timer)
+
+      times.total = measure(totalTimer)
+
+      // Format and print timing
+      if(options.logTiming) {
+        let framesTotal = 0
+        for(let i = 0; i < frames.length; i++) {
+          framesTotal += times.frames[i]
+        }
+        const framesAvg = framesTotal / Math.max(frames.length, 1)
+
+        let mse = 0
+        for(let i = 0; i < frames.length; i++) {
+          mse += (times.frames[i] - framesAvg) ** 2
+        }
+        mse /= Math.max(frames.length, 1)
+
+        function fmt(n: number): string { return n.toFixed(2) }
+        console.log(`timing info (ms): total=${fmt(times.total)}, record=${fmt(times.record)}, frames=${fmt(framesTotal)} (avg=${fmt(framesAvg)}, sd=${fmt(Math.sqrt(mse))}), encode=${fmt(times.encode)}`)
       }
 
       return new Blob(vec.finish())
