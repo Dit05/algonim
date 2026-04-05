@@ -51,3 +51,5 @@ export class BitVector {
   }
 
 }
+
+// TODO unit tests for this

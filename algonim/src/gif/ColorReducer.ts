@@ -44,6 +44,16 @@ export function toCounted(colors: CouldBeIterable<Color>): ColorArrays {
   return mapToArrays(map)
 }
 
+export function scaleCounts(counts: ArrayLike<number>, scale: number): Uint32Array {
+  const scaled = new Uint32Array(counts.length)
+
+  for(let i = 0; i < scaled.length; i++) {
+    scaled[i] = Math.max(1, Math.round(counts[i] * scale))
+  }
+
+  return scaled
+}
+
 export function mergeCounteds(arrays: CouldBeIterable<ColorArrays>): ColorArrays {
   arrays = makeIterable(arrays)
   const map = new Map<Color, number>()
@@ -72,6 +82,7 @@ export abstract class ColorReducer {
           const here = array[i]
           if(isNaN(here)) CONFIG.warnInconsistency(`counts[${i}] is NaN`)
           else if(!isFinite(here)) CONFIG.warnInconsistency(`counts[${i}] is not finite`)
+          else if(here < 1) CONFIG.warnInconsistency(`counts[${i}] is less than 1 (it's ${here})`)
           sum += here
         }
         return sum

@@ -5,6 +5,8 @@ import { Netscape2 } from '@/gif/blocks/extensions/Netscape2'
 import { GraphicControl } from '@/gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence, Frame } from '@/Sequence'
+import { toCounted, scaleCounts, mergeCounteds, ColorArrays } from '@/gif/ColorReducer'
+import { ColorUtil } from '@/gif/Color'
 import * as ColorReducers from '@/gif/color_reducers'
 import * as GIFTESTS from '@/gif/Tests'
 
@@ -18,7 +20,7 @@ export type GifOptions = {
   /** Whether to automatically use color tables smaller than {@link colorTableBits} when possible. */
   allowSmallerTables: boolean,
   /** Whether to use a new color table for every image instead of using a single global color table. */
-  useLocalColorTables: boolean, // TODO
+  useLocalColorTables: boolean,
   /** Number of times the animation should loop, from `0` (infinite) up to `65535`. `Infinity` is treated as 0 and `NaN` is treated as `1`. If left `undefined`, no Netscape 2.0 block will be added to the GIF and looping will be unspecified. */
   loopCount: number | undefined,
   /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
@@ -32,7 +34,7 @@ const DEFAULT_GIF_OPTIONS: GifOptions = {
   allowSmallerTables: true,
   useLocalColorTables: false,
   loopCount: undefined,
-  encodingBufferSize: 1024,
+  encodingBufferSize: 8192,
   logTiming: true
 }
 
@@ -137,8 +139,6 @@ export class Algonim extends HTMLElement {
       // Make the GIF
       const gif = new Gif(gifCanvas.width, gifCanvas.height)
 
-      gif.globalColorTable = undefined
-
       const reducer = new ColorReducers.Tiered([
         {
           limit: 2048,
@@ -154,8 +154,22 @@ export class Algonim extends HTMLElement {
         }
       ])
 
+      // Global color table
+      if(!options.useLocalColorTables) {
+        const frameArrays = new Array<ColorArrays>(frames.length)
+        for(let i = 0; i < frames.length; i++) {
+          const arrays = toCounted(ColorUtil.imageDataToColors(frames[i].image))
+          arrays.counts = scaleCounts(arrays.counts, 1.0 / frames.length)
+          frameArrays[i] = arrays
+        }
+        const globalArrays = mergeCounteds(frameArrays)
+        gif.globalColorTable = ColorTable.createQuantized(reducer, options.colorTableBits - 1, globalArrays, options.allowSmallerTables)
+      } else {
+        gif.globalColorTable = undefined
+      }
+
       // Add the Netscape 2.0 block if looping is specified
-      let loops = optionsOverrides.loopCount
+      let loops = options.loopCount
       if(loops != undefined) {
         if(isNaN(loops)) {
           loops = 1
@@ -177,10 +191,12 @@ export class Algonim extends HTMLElement {
         control.delay = frame.delay
         gif.blocks.push(control)
 
-        // TODO globalable table
-        const localTable = ColorTable.createQuantized(reducer, options.colorTableBits - 1, frame.image, options.allowSmallerTables)
-        const image = Image.fromCanvasImageData(frame.image, localTable)
-        image.tableIsLocal = true
+        const imageTable: ColorTable = gif.globalColorTable === undefined
+          ? ColorTable.createQuantized(reducer, options.colorTableBits - 1, frame.image, options.allowSmallerTables)
+          : gif.globalColorTable
+
+        const image = Image.fromCanvasImageData(frame.image, imageTable)
+        image.tableIsLocal = options.useLocalColorTables
         gif.blocks.push(image)
         times.frames[i] = measure(timer)
 

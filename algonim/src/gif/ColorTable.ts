@@ -51,7 +51,7 @@ export class ColorTable {
       : toCounted(colors)
 
     if(allowSmallerSizefield) {
-      sizefield = ColorTable.desiredSizeToSizefield(arrays.colors.length) ?? ColorTable.MAX_SIZEFIELD
+      sizefield = Math.min(sizefield, ColorTable.desiredSizeToSizefield(arrays.colors.length) ?? ColorTable.MAX_SIZEFIELD)
     }
     const table = new ColorTable(sizefield)
 
