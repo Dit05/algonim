@@ -59,9 +59,10 @@ async function slideshow() {
 async function makeGif() {
   showError(undefined)
   options = {
-    colorTableBits: document.getElementById('gif-tableBits').value,
-    allowSmallerTables: document.getElementById('gif-allowSmallerTables').checked,
-    loopCount: document.getElementById('gif-allowSmallerTables').checked ? Infinity : NaN
+    colorTableBits: Number(document.getElementById('gif-tableBits').value),
+    allowSmallerTables: Boolean(document.getElementById('gif-allowSmallerTables').checked),
+    loopCount: Number(document.getElementById('gif-loop').checked ? Infinity : NaN),
+    useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables'))
   }
 
   let blob = undefined

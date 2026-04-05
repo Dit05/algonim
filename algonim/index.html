@@ -10,25 +10,53 @@
   <body>
 
     <div style="min-height: 100vh; margin-right: 8px;">
+      <header>
+        <h1>Algonim</h1>
+      </header>
+      <hr>
       <div style="width: 100%; display: flex; flex-direction: row;">
         <textarea id="script-area" placeholder="async (seq) => { /* ... */ }" spellcheck="false" style="width: 40vw; height: 30em; margin-bottom: -3px;"></textarea>
         <div style="flex-grow: 1;">
-          <iframe style="width: 100%; height: 100%;" src="./docs/index.html"></iframe>
+          <iframe id="docs-iframe" style="width: 100%; height: 100%; display: none;" src="./docs/index.html"></iframe>
         </div>
       </div>
       <div>
-        <!-- TODO eyeplain options -->
-        <input id="gif-tableBits" type="NUMBER" min="1" max="8" value="8"></input>
-        <input id="gif-allowSmallerTables" type="CHECKBOX" checked></input>
-        <input id="gif-loop" type="CHECKBOX" checked></input>
-        <button onclick="makeGif()">GIF</button>
-        <button onclick="slideshow()">Slideshow</button>
-        <select id="example-select"><option value=""></option></select>
-        <button id="example-load" onclick="loadExample(document.getElementById('example-select').value)">Load example</button>
-        <progress id="gif-progress" hidden="true"></progress>
-        <a href="./docs/index.html">docs</a>
         <br>
         <div id="error-div" style="color: red; display: none;"><div>error text</div><button onclick="showError(undefined)">ok</button></div>
+
+        <div style="display: flex; flex-direction: row;">
+          <div>
+            <!-- Slideshow settings -->
+            <button onclick="slideshow()">Slideshow</button>
+            <button onclick="stopSlideshow()" disabled="true">Stop</button>
+            <div style="height: 1em;"></div>
+            <select id="example-select"><option value=""></option></select>
+            <button id="example-load" onclick="loadExample(document.getElementById('example-select').value)">Load example</button>
+            <br>
+            <input autocomplete="off" onchange="document.getElementById('docs-iframe').style.display = this.checked ? 'block' : 'none'" type="CHECKBOX"></input>
+            <a href="./docs/index.html">Documentation</a>
+          </div>
+          <div style="margin-left: 1em; margin-right: 1em; border-left: 1px solid black;"></div>
+          <div>
+            <!-- GIF settings -->
+            <button onclick="this.disabled = true; makeGif().finally(() => {this.disabled = false})">Make GIF</button>
+            <progress id="gif-progress" hidden="true"></progress>
+            <div style="height: 1em;"></div>
+            <form>
+              <input id="gif-tableBits" type="NUMBER" min="1" max="8" value="8"></input>
+              <label for="gif-tableBits">Color table bits</label>
+              <br>
+              <input id="gif-allowSmallerTables" type="CHECKBOX" checked></input>
+              <label for="gif-allowSmallerTables">Use less bits if possible</label>
+              <br>
+              <input id="gif-useLocalColorTables" type="CHECKBOX"></input>
+              <label for="gif-useLocalColorTables">Unique color table per frame</label>
+              <br>
+              <input id="gif-loop" type="CHECKBOX" checked></input>
+              <label for="gif-loop">Repeat animation</label>
+            </form>
+          </div>
+        </div>
       </div>
 
       <br>
