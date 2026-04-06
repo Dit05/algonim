@@ -103,3 +103,24 @@ export function makePalette(n: number): Gif {
   gif.blocks.push(img)
   return gif
 }
+
+export function makeToothpaste(): Gif {
+  const gif = new Gif(8, 5)
+
+  const table = new ColorTable(ColorTable.desiredSizeToSizefield(4) ?? -1)
+  table.colors[0] = 0x000000
+  table.colors[1] = 0x5bcefa
+  table.colors[2] = 0xf5a9b8
+  table.colors[3] = 0xffffff
+
+  const image = new Image(gif.width, gif.height, table)
+  for(let y = 0; y < image.height; y++) {
+    for(let x = 0; x < image.width; x++) {
+      const index = 3 - Math.abs(y - 2)
+      image.indices[(y * image.width) + x] = index
+    }
+  }
+  gif.blocks.push(image)
+
+  return gif
+}
