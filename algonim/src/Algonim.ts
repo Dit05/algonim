@@ -1,4 +1,4 @@
-import { Gif } from '@/gif/Gif'
+import { Gif, b } from '@/gif/Gif'
 import { ColorTable } from '@/gif/ColorTable'
 import { Image } from '@/gif/blocks/Image'
 import { Netscape2 } from '@/gif/blocks/extensions/Netscape2'
@@ -8,6 +8,7 @@ import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence, Frame } from '@/Sequence'
 import { toCounted, scaleCounts, mergeCounteds, ColorArrays } from '@/gif/ColorReducer'
 import { ColorUtil } from '@/gif/Color'
+import { Parser, BlockSignature } from '@/gif/Parser'
 import * as ColorReducers from '@/gif/color_reducers'
 import * as GIFTESTS from '@/gif/Tests'
 
@@ -252,10 +253,37 @@ export class Algonim extends HTMLElement {
 
 }
 
-export async function importCodeFromGif(file: File): Promise<string> {
-  // TODO
+export async function importEmbedFromGif(file: File): Promise<Uint8Array> {
   const bytes: Uint8Array = await file.bytes()
-  return 'uhhh idfk ' + bytes.slice(0, 8)
+  const parser = new Parser(bytes)
+
+  let embed: BlockSignature | undefined = undefined
+  for(const sig of parser.manifest) {
+    if(sig.info.type === 'extension' && sig.info.extensionType === 'application' && sig.info.identifier === CodeEmbed.ID) {
+      const version = sig.info.authenticationCode
+      const expected = [b`1`, b`0`, b`0`]
+      let versionMatches = true
+      for(let i = 0; i < expected.length; i++) {
+        versionMatches &&= version[i] === expected[i]
+      }
+      if(!versionMatches) {
+        console.warn(`Application extension version wasn't the expected value (actual: ${version}, expected: ${expected}).`)
+      }
+
+      embed = sig
+    }
+  }
+
+  if(embed === undefined) {
+    throw new Error("GIF doesn't contain embedded code.")
+  }
+
+  const block = parser.readBlock(embed)
+  if(!(block instanceof CodeEmbed)) {
+    throw new Error("Read block was not actually a CodeEmbed. This should never happen.")
+  }
+
+  return block.utf8
 }
 
 

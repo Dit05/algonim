@@ -59,13 +59,18 @@ function dropHandler(ev) {
       throw new Error("No GIF file has been provided.")
     }
 
-    window.Algonim.importCodeFromGif(files[0])
-      .then((str) => {
+    window.Algonim.importEmbedFromGif(files[0])
+      .catch((err) => {
+        showError(err)
+      })
+      .then((payload) => {
+        const decoder = new TextDecoder()
+        const str = decoder.decode(payload)
         document.getElementById('script-area').value = str
       })
 
   } catch(err) {
-    showError(err, true)
+    showError(err)
   }
 }
 

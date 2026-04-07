@@ -4,11 +4,13 @@ import { ApplicationExtension } from '../ApplicationExtension'
 
 export class CodeEmbed extends ApplicationExtension {
 
+  public static readonly ID = 'Algonim.'
+
   public utf8: Uint8Array
 
   // Application Extension
   public constructor(utf8: Uint8Array) {
-    super('Algonim.')
+    super(CodeEmbed.ID)
     this.utf8 = utf8
   }
 

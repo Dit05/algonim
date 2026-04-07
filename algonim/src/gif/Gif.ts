@@ -24,6 +24,9 @@ export class Gif {
   // https://www.w3.org/Graphics/GIF/spec-gif89a.txt
   // GIF is little endian
 
+  public static readonly SIGNATURE: string = 'GIF'
+  public static readonly VERSION: string = '89a'
+
   /** Maximum width/height. */
   public static readonly MAX_DIMENSION = (256 * 256) - 1
 
@@ -71,9 +74,9 @@ export class Gif {
   }
 
   private static emitHeader(vec: ByteVector) {
-    const HEADER = "GIF89a"
-    for(let i = 0; i < HEADER.length; i++) {
-      vec.addUint8(HEADER.charCodeAt(i))
+    const header = Gif.SIGNATURE + Gif.VERSION
+    for(let i = 0; i < header.length; i++) {
+      vec.addUint8(header.charCodeAt(i))
     }
   }
 
@@ -91,7 +94,7 @@ export class Gif {
 
     vec.addUint8(this.globalColorTable !== null ? this.backgroundColorIndex : 0)
 
-    // TODO
+    // TO-DO
     let aspectRatio: number = 0
     vec.addUint8(aspectRatio)
 
@@ -158,12 +161,5 @@ export class Gif {
     if(size > 0) finishSubBlock() // Remaining data
     finishSubBlock() // Mandatory 0-size sub-block at the end
   }
-
-
-  // TODO: color reducer
-  // badness(color_small, color_big) = population(color_small) * difference(color_small, color_big)
-  // keep doing the lowest-badness merges until the palette is small enough
-
-  // TODO: figure out how to determine whether to use a global color table
 
 }
