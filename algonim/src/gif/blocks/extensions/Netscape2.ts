@@ -28,8 +28,7 @@ export class Netscape2 extends ApplicationExtension {
   }
 
   isInvalidIn(gif: Gif): Error | null {
-    super.isInvalidIn(gif)
-    return null
+    return super.isInvalidIn(gif)
   }
   //
 

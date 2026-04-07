@@ -2,6 +2,7 @@ import { Gif } from '@/gif/Gif'
 import { ColorTable } from '@/gif/ColorTable'
 import { Image } from '@/gif/blocks/Image'
 import { Netscape2 } from '@/gif/blocks/extensions/Netscape2'
+import { CodeEmbed } from '@/gif/blocks/extensions/CodeEmbed'
 import { GraphicControl } from '@/gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
 import { SequenceFn, Sequence, Frame } from '@/Sequence'
@@ -26,7 +27,9 @@ export type GifOptions = {
   /** Size of the temporary buffer used during encoding the GIF file. Only affects encoding performance. */
   encodingBufferSize: number,
   /** Whether timing info should be logged to the console. */
-  logTiming: boolean
+  logTiming: boolean,
+  /** Arbitrary bytes to embed into the image using an Algonim Application Extension block. */
+  embedContent: Uint8Array | undefined
 }
 
 const DEFAULT_GIF_OPTIONS: GifOptions = {
@@ -35,7 +38,8 @@ const DEFAULT_GIF_OPTIONS: GifOptions = {
   useLocalColorTables: false,
   loopCount: undefined,
   encodingBufferSize: 8192,
-  logTiming: true
+  logTiming: true,
+  embedContent: undefined
 }
 
 
@@ -168,7 +172,12 @@ export class Algonim extends HTMLElement {
         gif.globalColorTable = undefined
       }
 
-      // Add the Netscape 2.0 block if looping is specified
+      // Add a code embed extension if there's embedded content
+      if(options.embedContent !== undefined) {
+        gif.blocks.push(new CodeEmbed(options.embedContent))
+      }
+
+      // Add a Netscape 2.0 extension if looping is specified
       let loops = options.loopCount
       if(loops != undefined) {
         if(isNaN(loops)) {

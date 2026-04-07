@@ -1,3 +1,4 @@
+'use strict'
 
 function downloadBlob(blob) {
   window.open(URL.createObjectURL(blob))
@@ -81,11 +82,19 @@ async function slideshow() {
 
 async function makeGif() {
   showError(undefined)
-  options = {
+
+  let embed = undefined
+  if(document.getElementById('gif-embedCode').checked) {
+    const encoder = new TextEncoder()
+    embed = encoder.encode(document.getElementById('script-area').value)
+  }
+
+  const options = {
     colorTableBits: Number(document.getElementById('gif-tableBits').value),
     allowSmallerTables: Boolean(document.getElementById('gif-allowSmallerTables').checked),
     loopCount: Number(document.getElementById('gif-loop').checked ? Infinity : NaN),
-    useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables'))
+    useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables').checked),
+    embedContent: embed
   }
 
   let blob = undefined
