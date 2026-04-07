@@ -72,6 +72,7 @@ function dropHandler(ev) {
 async function slideshow() {
   showError(undefined)
   try {
+    algonim.scrollIntoView()
     await algonim.slideshow(getUserFunction())
   } catch(err) {
     showError(err, true)
