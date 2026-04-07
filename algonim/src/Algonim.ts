@@ -243,6 +243,12 @@ export class Algonim extends HTMLElement {
 
 }
 
+export async function importCodeFromGif(file: File): Promise<string> {
+  // TODO
+  const bytes: Uint8Array = await file.bytes()
+  return 'uhhh idfk ' + bytes.slice(0, 8)
+}
+
 
 // Module setup
 customElements.define('algonim-element', Algonim)

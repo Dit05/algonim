@@ -23,6 +23,7 @@
       <div>
         <br>
         <div id="error-div" style="color: red; display: none;"><div>error text</div><button onclick="showError(undefined)">ok</button></div>
+        <br>
 
         <div style="display: flex; flex-direction: row;">
           <div>
@@ -40,6 +41,11 @@
           <div>
             <!-- GIF settings -->
             <button onclick="this.disabled = true; makeGif().finally(() => {this.disabled = false})">Make GIF</button>
+            <br>
+            <label id="drop-zone">
+              Drop or select a GIF to import its code
+              <input type="file" id="file-input" multiple accept="image/*" />
+            </label>
             <progress id="gif-progress" hidden="true"></progress>
             <div style="height: 1em;"></div>
             <form>
@@ -94,6 +100,41 @@
         loadExample('complete example')
         //slideshow()
       }
+
+      // All of the following is file drop boiler plate from MDN
+      // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop
+      const dropZone = document.getElementById('drop-zone')
+      dropZone.addEventListener('drop', dropHandler)
+      window.addEventListener('drop', (e) => {
+        if([...e.dataTransfer.items].some((item) => item.kind === 'file')) {
+          e.preventDefault()
+        }
+      })
+      dropZone.addEventListener('dragover', (e) => {
+        const fileItems = [...e.dataTransfer.items].filter(
+          (item) => item.kind === 'file',
+        )
+        if (fileItems.length > 0) {
+          e.preventDefault()
+          if(fileItems.some((item) => item.type.startsWith('image/'))) {
+            e.dataTransfer.dropEffect = 'copy'
+          } else {
+            e.dataTransfer.dropEffect = 'none'
+          }
+        }
+      })
+
+      window.addEventListener('dragover', (e) => {
+        const fileItems = [...e.dataTransfer.items].filter(
+          (item) => item.kind === 'file',
+        )
+        if(fileItems.length > 0) {
+          e.preventDefault()
+          if(!dropZone.contains(e.target)) {
+            e.dataTransfer.dropEffect = 'none'
+          }
+        }
+      })
     </script>
   </body>
 </html>

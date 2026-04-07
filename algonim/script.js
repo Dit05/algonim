@@ -3,14 +3,14 @@ function downloadBlob(blob) {
   window.open(URL.createObjectURL(blob))
 }
 
-function showError(err) {
+function showError(err, selectLine = false) {
   const div = document.getElementById('error-div')
 
   if(err) {
     console.error(err)
     div.style.display = 'block'
     div.children[0].innerText = err
-    if(err.lineNumber) {
+    if(selectLine && err.lineNumber) {
       const scriptArea = document.getElementById('script-area')
       const text = scriptArea.value
 
@@ -46,13 +46,35 @@ function getUserFunction() {
   return result
 }
 
+function dropHandler(ev) {
+  showError(undefined)
+  try {
+    ev.preventDefault()
+    const files = [...ev.dataTransfer.items]
+      .map((item) => item.getAsFile())
+      .filter((file) => file && file.type == 'image/gif')
+
+    if(files.length == 0) {
+      throw new Error("No GIF file has been provided.")
+    }
+
+    window.Algonim.importCodeFromGif(files[0])
+      .then((str) => {
+        document.getElementById('script-area').value = str
+      })
+
+  } catch(err) {
+    showError(err, true)
+  }
+}
+
 
 async function slideshow() {
   showError(undefined)
   try {
     await algonim.slideshow(getUserFunction())
   } catch(err) {
-    showError(err)
+    showError(err, true)
   }
 }
 
