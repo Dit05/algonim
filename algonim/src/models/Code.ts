@@ -217,7 +217,8 @@ export class Code extends Model {
       const drawResult = wrapper.drawText(text, Point(x, y), drawer.getSize().width - x, this.textStyle)
 
       if(this.numberSeparatorStyle !== null && numberSeparatorX !== null) {
-        drawer.drawLine(Point(numberSeparatorX, y), Point(numberSeparatorX, y + drawResult.size.height - 1), this.numberSeparatorStyle)
+        // For some reason, -0.5 yields the most continuous line.
+        drawer.drawLine(Point(numberSeparatorX, y), Point(numberSeparatorX, y + drawResult.size.height - 0.5), this.numberSeparatorStyle)
       }
 
       if(isArrowLine(i)) {

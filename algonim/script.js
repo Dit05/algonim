@@ -1,16 +1,41 @@
+'use strict'
 
 function downloadBlob(blob) {
   window.open(URL.createObjectURL(blob))
 }
 
-function makeGif() {
-  options = {
-    colorTableBits: document.getElementById('gif-tableBits').value,
-    allowSmallerTables: document.getElementById('gif-allowSmallerTables').checked,
-    loopCount: document.getElementById('gif-allowSmallerTables').checked ? Infinity : NaN
+function showError(err, selectLine = false) {
+  const div = document.getElementById('error-div')
+
+  if(err) {
+    console.error(err)
+    div.style.display = 'block'
+    div.children[0].innerText = err
+    if(selectLine && err.lineNumber) {
+      const scriptArea = document.getElementById('script-area')
+      const text = scriptArea.value
+
+      let lines = err.lineNumber
+      let start = -1
+      let end = -1
+      while(lines --> 0) {
+        if(lines === 1) start = end + 1
+        end = text.indexOf('\n', end + 1)
+      }
+
+      scriptArea.focus()
+      scriptArea.setSelectionRange(start, end)
+    }
+  } else {
+    div.style.display = 'none'
   }
-  algonim.recordGif(getUserFunction(), document.getElementById('gif-progress'), options)
-    .then(blob => downloadBlob(blob))
+}
+
+function loadExample(name) {
+  document.getElementById('example-select').value = ''
+  if(name in examples) {
+    document.getElementById('script-area').value = String(examples[name]).replace('async function(seq)', 'async (seq) =>')
+  }
 }
 
 function getUserFunction() {
@@ -22,15 +47,68 @@ function getUserFunction() {
   return result
 }
 
-function slideshow() {
-  algonim.slideshow(getUserFunction())
+function dropHandler(ev) {
+  showError(undefined)
+  try {
+    ev.preventDefault()
+    const files = [...ev.dataTransfer.items]
+      .map((item) => item.getAsFile())
+      .filter((file) => file && file.type == 'image/gif')
+
+    if(files.length == 0) {
+      throw new Error("No GIF file has been provided.")
+    }
+
+    window.Algonim.importEmbedFromGif(files[0])
+      .catch((err) => {
+        showError(err)
+      })
+      .then((payload) => {
+        const decoder = new TextDecoder()
+        const str = decoder.decode(payload)
+        document.getElementById('script-area').value = str
+      })
+
+  } catch(err) {
+    showError(err)
+  }
 }
 
-function loadExample(name) {
-  document.getElementById('example-select').value = ''
-  if(name in examples) {
-    document.getElementById('script-area').value = String(examples[name]).replace('async function(seq)', 'async (seq) =>')
+
+async function slideshow() {
+  showError(undefined)
+  try {
+    algonim.scrollIntoView()
+    await algonim.slideshow(getUserFunction())
+  } catch(err) {
+    showError(err, true)
   }
+}
+
+async function makeGif() {
+  showError(undefined)
+
+  let embed = undefined
+  if(document.getElementById('gif-embedCode').checked) {
+    const encoder = new TextEncoder()
+    embed = encoder.encode(document.getElementById('script-area').value)
+  }
+
+  const options = {
+    colorTableBits: Number(document.getElementById('gif-tableBits').value),
+    allowSmallerTables: Boolean(document.getElementById('gif-allowSmallerTables').checked),
+    loopCount: Number(document.getElementById('gif-loop').checked ? Infinity : NaN),
+    useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables').checked),
+    embedContent: embed
+  }
+
+  let blob = undefined
+  try {
+    blob = await algonim.recordGif(getUserFunction(), document.getElementById('gif-progress'), options)
+  } catch(err) {
+    showError(err)
+  }
+  if(blob) downloadBlob(blob)
 }
 
 
