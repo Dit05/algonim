@@ -1,7 +1,7 @@
-import { Point, Vector, Size } from '@/gfx/Primitives'
+import { Point, Size } from '@/gfx/Primitives'
 import { Color, ColorUtil } from '@/gif/Color'
 import { Drawer } from '@/gfx/Drawer'
-import { RasterModel } from './RasterModel'
+import { Raster } from './Raster'
 import { KDTree } from '@/util/KDTree'
 
 
@@ -10,7 +10,7 @@ type Data = {
   stringyMap: Map<string, Color>
 }
 
-export class Voronoi extends RasterModel<Data> {
+export class Voronoi extends Raster<Data> {
 
   public readonly points: Map<Point, Color> = new Map()
   public rootColor: Color | undefined = ColorUtil.rgb(1, 1, 1)
