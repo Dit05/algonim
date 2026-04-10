@@ -1,238 +1,127 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
+import { LineStyle, ArrowStyle, FontStyle } from '@/gfx/Styles'
 import { Point, Size, SizeUtil, VectorUtil } from '@/gfx/Primitives'
 import { TextAlign } from '@/gfx/Styles'
 import { Border, EllipseBorder } from '@/gfx/Border'
 import { Region } from '@/gfx/Region'
-import * as CONFIG from '@/config'
 
 
-/** Connects two {@link Node}s. */
-export class Edge {
-  private bidirectional: boolean
-  private source: Node
-  private destination: Node
+export type Layout = { [key: string]: { pos: [number, number], value: any, connect: string[] } }
 
-
-  public constructor(source: Node, destination: Node, bidirectional: boolean) {
-    // TODO fail without breaking invariants
-    this.source = source
-    this.destination = destination
-    this.bidirectional = bidirectional
-
-    this.link(source, 'outgoing')
-    this.link(destination, 'incoming')
-    this.setBidirectional(bidirectional)
-  }
-
-
-  private link(node: Node, direction: 'incoming' | 'outgoing') {
-    const array = node.getRawArray(direction)
-    const index = array.indexOf(this)
-
-    if(CONFIG.CONSISTENCY_CHECKS && array.indexOf(this) !== -1) {
-      CONFIG.warnInconsistency("GraphModel Edge being linked multiple times to the same Node")
-    }
-
-    if(index !== -1) return // Already present, don't do anything
-
-    array.push(this)
-  }
-
-  private unlink(node: Node, direction: 'incoming' | 'outgoing') {
-    const array = node.getRawArray(direction)
-    const index = array.indexOf(this)
-
-    if(index === -1) return // Not present, don't do anything
-
-    array.splice(index, 1)
-
-    if(CONFIG.CONSISTENCY_CHECKS && array.indexOf(this) !== -1) {
-      CONFIG.warnInconsistency("GraphModel Edge still in array after being unlinked")
-    }
-
-    return true
-  }
-
-  private checkInvariants() {
-    if(!CONFIG.CONSISTENCY_CHECKS) return
-
-    if(this.source.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge not in outgoing array of source")
-    if(this.destination.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge not in incoming array of destination")
-    if(this.bidirectional) {
-      if(this.source.getRawArray('incoming').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge (bidirectional) not in incoming array of source")
-      if(this.destination.getRawArray('outgoing').indexOf(this) === -1) CONFIG.warnInconsistency("GraphModel Edge (bidirectional) not in outgoing array of destination")
-    } else {
-      if(this.source.getRawArray('incoming').indexOf(this) !== -1) CONFIG.warnInconsistency("GraphModel Edge (unidirectional) is in incoming array of source")
-      if(this.destination.getRawArray('outgoing').indexOf(this) !== -1) CONFIG.warnInconsistency("GraphModel Edge (unidirectional) is in outgoing array of destination")
-    }
-  }
-
-
-  public getSource(): Node {
-    return this.source
-  }
-
-  public getDestination(): Node {
-    return this.destination
-  }
-
-  public getBidirectional(): boolean {
-    return this.bidirectional
-  }
-
-
-  public setSource(newValue: Node) {
-    if(newValue === this.source) return
-
-    this.unlink(this.source, 'outgoing')
-    if(this.bidirectional) {
-      this.unlink(this.source, 'incoming')
-    }
-
-    this.source = newValue
-
-    this.link(this.source, 'outgoing')
-    if(this.bidirectional) {
-      this.link(this.source, 'incoming')
-    }
-
-    this.checkInvariants()
-  }
-
-  public setDestination(newValue: Node) {
-    if(newValue === this.destination) return
-
-    this.unlink(this.destination, 'incoming')
-    if(this.bidirectional) {
-      this.unlink(this.destination, 'outgoing')
-    }
-
-    this.destination = newValue
-
-    this.link(this.destination, 'incoming')
-    if(this.bidirectional) {
-      this.link(this.destination, 'outgoing')
-    }
-
-    this.checkInvariants()
-  }
-
-  public setBidirectional(newValue: boolean) {
-    if(this.bidirectional == newValue) return
-
-    // uni -> bi: link
-    // bi -> uni: unlink
-    const action = newValue ? this.link : this.unlink
-    action(this.source, 'incoming')
-    action(this.source, 'outgoing')
-
-    this.checkInvariants()
-  }
-}
 
 /** Graph node with a position that can contain any value. */
 export class Node {
 
-  private incoming: Edge[] = []
-  private outgoing: Edge[] = []
-
+  /** Set of other nodes to draw outgoing edges to. If this node is also in the other node's connection set, then the edge is bidirectional. */
+  public readonly connections: Set<Node> = new Set()
+  /** Position of the center of the node relative to the top-left corner of the model's drawing area. */
   public position: Point = Point(0, 0)
+  /** Content drawn in the node. */
   public value: any = null
 
+  /** Border around {@link value}. {@link Border} is designed to be stateless, so multiple nodes are free to share border instances. */
   public border: Border | null = null
 
 
-  /** Gets one of the internal edge arrays. It is not recommended to modify these. */
-  public getRawArray(direction: 'incoming' | 'outgoing'): Edge[] {
-    switch(direction) {
-      case 'incoming': return this.incoming
-      case 'outgoing': return this.outgoing
-    }
-  }
-
-  public connect(other: Node, bidirectional: boolean = false): Edge {
-    return new Edge(this, other, bidirectional)
-  }
-
-  public *getIncomingEdges(): Generator<Edge> {
-    for(let edge of this.incoming) yield edge
-  }
-
-  public *getOutgoingEdges(): Generator<Edge> {
-    for(let edge of this.outgoing) yield edge
-  }
-
-  /** Creats an array of all nodes reachable via edges, always including this one. */
-  public discoverLinkedNodes(): Node[] {
-    // TODO better
-    // potential idea: use only 1 array
-    const visited: Node[] = []
+  /** Adds all nodes reachable via outgoing edges to the given set, always including this one. */
+  public discoverLinkedNodes(visited: Set<Node>) {
     const toVisit: Node[] = [ this ]
 
     let current = toVisit.pop()
     while(current !== undefined) {
-      visited.push(current)
+      visited.add(current)
 
-      for(let edge of current.incoming) {
-        if(visited.indexOf(edge.getSource()) === -1) {
-          toVisit.push(edge.getSource())
-        }
-      }
-      for(let edge of current.outgoing) {
-        if(visited.indexOf(edge.getDestination()) === -1) {
-          toVisit.push(edge.getDestination())
+      for(const other of current.connections) {
+        if(!visited.has(other)) {
+          toVisit.push(other)
         }
       }
 
       current = toVisit.pop()
     }
-
-    return visited
   }
 
 }
 
-/** Displays {@link Node}s interconnected by {@link Edge}s. */
+/** Displays an interconnected network of {@link Node}s. */
 export class Graph extends Model {
 
-  /** Nodes from which drawing begins. */
-  public roots: Node[] | Node | null = null
+  /** Nodes from which drawing begins. When drawing, outgoing edges are automatically followed to discover more nodes to draw. */
+  public roots: Iterable<Node> | Node | undefined = undefined
   /** Border used when a node doesn't specify its own. */
   public defaultBorder: Border = new EllipseBorder()
 
+  /** Style applied to lines of edges, including the arrow heads. */
+  public edgeLineStyle: Partial<LineStyle> = {}
+  /** Style applied to arrow heads of edges. */
+  public edgeArrowStyle: Partial<ArrowStyle> = {}
+  /** Style applied to node content. */
+  public textStyle: Partial<FontStyle> = {}
 
+
+  /** Creates a new {@link Node}. For it to show up during drawing, it needs to be reachable from {@link roots} via outgoing edges. */
   public createNode(): Node {
     return new Node()
   }
 
-  public draw(drawer: Drawer): void {
-    if(this.roots === null) return
+  /** Creates and connects nodes based on a layout object. Also sets these as the roots. */
+  public setLayout(layout: Layout): { [key: string]: Node } {
+    const nodes: { [key: string]: Node } = {}
 
-    const nodes: Node[] = []
-    if(this.roots instanceof Array) {
-      for(let root of this.roots) {
-        for(let linked of root.discoverLinkedNodes()) {
-          nodes.push(linked)
+    for(const key in layout) {
+      const node = this.createNode()
+      node.value = layout[key].value
+      node.position = { x: layout[key].pos[0], y: layout[key].pos[1] }
+      nodes[key] = node
+    }
+
+    for(const key in layout) {
+      for(const destKey of (layout[key].connect ?? [])) {
+        const other = nodes[destKey]
+        if(!other) {
+          throw new RangeError(`Destination node '${destKey}' doesn't exist.`)
         }
-      }
-    } else if(this.roots instanceof Node) {
-      for(let linked of this.roots.discoverLinkedNodes()) {
-        nodes.push(linked)
+
+        nodes[key].connections.add(other)
       }
     }
 
-    const sizes = new WeakMap()
+    this.roots = Object.values(nodes)
+    return nodes
+  }
 
-    for(let node of nodes) {
+  public draw(drawer: Drawer): void {
+    // Get roots as an Iterable
+    let effectiveRoots: Iterable<Node>
+    if(this.roots instanceof Node) {
+      effectiveRoots = [this.roots]
+    } else if(this.roots === undefined) {
+      effectiveRoots = []
+    } else {
+      effectiveRoots = this.roots
+    }
+
+    // Add linked nodes from all roots
+    const nodes: Set<Node> = new Set()
+    for(const root of effectiveRoots) {
+      root.discoverLinkedNodes(nodes)
+    }
+
+    // Draw nodes and cache their sizes
+    const sizes = new Map()
+    const ids = new Map()
+    for(const node of nodes) {
+      ids.set(ids.size, node)
+
       const str = String(node.value)
       const align: TextAlign = { align: 'center', baseline: 'middle' }
 
-      const metrics = drawer.measureText(str, align)
+      const metrics = drawer.measureText(str, align, this.textStyle)
       const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
       sizes.set(node, textSize)
 
-      drawer.drawText(str, node.position, align)
+      drawer.drawText(str, node.position, align, this.textStyle)
 
       const border = node.border || this.defaultBorder
       const borderBounds: Region = border.getBounds(textSize)
@@ -244,12 +133,15 @@ export class Graph extends Model {
     }
 
     // Draw edges
-    for(let node of nodes) {
-      for(let edge of node.getOutgoingEdges()) {
-        const other = edge.getDestination()
+    const drawnBidirectional: Set<string> = new Set()
+    for(const node of nodes) {
+      for(const other of node.connections) {
+        if(!(other instanceof Node)) {
+          throw new TypeError(`Found something in the connection set of a Node that isn't a Node. (It's: ${other})`)
+        }
 
-        let startPos = edge.getSource().position
-        let endPos = edge.getDestination().position
+        let startPos = node.position
+        let endPos = other.position
 
         const startAngle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x)
         startPos = VectorUtil.add(startPos, this.defaultBorder.getBoundaryPoint(sizes.get(node), startAngle))
@@ -257,9 +149,22 @@ export class Graph extends Model {
         const endAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
         endPos = VectorUtil.add(endPos, this.defaultBorder.getBoundaryPoint(sizes.get(other), endAngle))
 
-        drawer.drawLine(startPos, endPos)
-        drawer.drawArrowhead(startPos, endPos)
-        if(edge.getBidirectional()) drawer.drawArrowhead(endPos, startPos)
+        let skip = false
+        if(other.connections.has(node)) {
+          // Check if this bidirectional edge hasn't been drawn yet
+          // Since we added `node;other`, we need to check for `other;node` from this perspective.
+          if(drawnBidirectional.has(`${ids.get(other)};${ids.get(node)}`)) {
+            skip = true
+          } else {
+            drawer.drawArrowhead(endPos, startPos, this.edgeLineStyle, this.edgeArrowStyle)
+            drawnBidirectional.add(`${ids.get(node)};${ids.get(other)}`)
+          }
+        }
+
+        if(!skip) {
+          drawer.drawLine(startPos, endPos, this.edgeLineStyle)
+          drawer.drawArrowhead(startPos, endPos, this.edgeLineStyle, this.edgeArrowStyle)
+        }
       }
     }
   }

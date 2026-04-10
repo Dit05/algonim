@@ -62,6 +62,7 @@ function dropHandler(ev) {
     window.Algonim.importEmbedFromGif(files[0])
       .catch((err) => {
         showError(err)
+        throw err
       })
       .then((payload) => {
         const decoder = new TextDecoder()
@@ -138,22 +139,12 @@ const examples = {
   fakeConsole.setLines(outputLines)
 
   const graph = seq.createModel('graph')
-  let node = graph.createNode()
-  node.position.x = 48
-  node.position.y = 48
-  node.value = 149
-
-  let node2 = graph.createNode()
-  node2.connect(node, false)
-  node2.position.x = 128
-  node2.position.y = 192
-
-  let node3 = graph.createNode()
-  node3.value = "lonely node"
-  node3.position.x = 180
-  node3.position.y = 450
-
-  graph.roots = [node, node3]
+  //graph.fontStyle.font = '8px sans'
+  graph.setLayout({
+    'node': { pos: [50, 50], value: 149, connect: ['node2', 'node3'] },
+    'node2': { pos: [200, 60], connect: ['node'] },
+    'node3': { pos: [100, 350], value: 'node three' }
+  })
 
   let layout = {
     'split': 'vertical',
@@ -173,8 +164,9 @@ const examples = {
   await seq.capture()
 
   let i = 3
-  const iSign = code.createSign(0)
-  iSign.text = `${i}`
+  const signs = {}
+  signs['i'] = code.createSign(0)
+  signs['i'].text = `${i}`
 
   code.arrowLines = 1
   await seq.capture()
@@ -185,7 +177,7 @@ const examples = {
     fakeConsole.setLines(outputLines)
     await seq.capture()
     i -= 1
-    iSign.text = `${i}`
+    signs['i'].text = `${i}`
     code.arrowLines = 3
     await seq.capture()
     code.arrowLines = 1
@@ -197,7 +189,7 @@ const examples = {
   code.arrowLines = null
   await seq.capture()
 
-  iSign.destroy()
+  signs['i'].destroy()
   code.createSign(4).text = 'Fin.'
   await seq.capture()
 },
