@@ -21,7 +21,7 @@ export class Netscape2 extends ApplicationExtension {
     const loops: number = this.loopCount
 
     const data = new DataView(new ArrayBuffer(3))
-    data.setUint8(0, 1) // ??? (TODO: find out what this is)
+    data.setUint8(0, 1) // ??? (TO-DO: find out what this is)
     data.setUint16(1, loops, true)
 
     return iterateDataViewBytes(data)
