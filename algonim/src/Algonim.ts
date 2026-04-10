@@ -5,7 +5,7 @@ import { Netscape2 } from '@/gif/blocks/extensions/Netscape2'
 import { CodeEmbed } from '@/gif/blocks/extensions/CodeEmbed'
 import { GraphicControl } from '@/gif/blocks/GraphicControl'
 import { ByteVector } from '@/gif/ByteVector'
-import { SequenceFn, Sequence, Frame } from '@/Sequence'
+import { SequenceFn, Sequence, Frame, CanceledError } from '@/Sequence'
 import { toCounted, scaleCounts, mergeCounteds, ColorArrays } from '@/gif/ColorReducer'
 import { ColorUtil } from '@/gif/Color'
 import { Parser, BlockSignature } from '@/gif/Parser'
@@ -50,6 +50,7 @@ const DEFAULT_GIF_OPTIONS: GifOptions = {
 export class Algonim extends HTMLElement {
 
   private canvas: HTMLCanvasElement
+  private actualSlideshow: Sequence | undefined = undefined
 
 
   public constructor() {
@@ -67,10 +68,31 @@ export class Algonim extends HTMLElement {
     return canvas
   }
 
-  public slideshow(func: SequenceFn): Promise<void> {
-    // TODO do something about concurrent runs
-    const seq = new Sequence(this.canvas)
-    return func(seq)
+  public async slideshow(func: SequenceFn): Promise<void> {
+    if(this.actualSlideshow !== undefined) {
+      this.stopSlideshow()
+    }
+
+    this.actualSlideshow = new Sequence(this.canvas)
+
+    try {
+      return await func(this.actualSlideshow)
+    } catch(err) {
+      if(err instanceof CanceledError) {
+        // ignore it
+      } else {
+        throw err
+      }
+    }
+  }
+
+  public stopSlideshow() {
+    if(this.actualSlideshow !== undefined) {
+      this.actualSlideshow.cancel()
+      this.canvas.width = 0
+      this.canvas.height = 0
+      this.actualSlideshow = undefined
+    }
   }
 
   public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, optionsOverrides: Partial<GifOptions> = {}): Promise<Blob> {

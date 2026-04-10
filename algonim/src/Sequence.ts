@@ -31,16 +31,19 @@ export type Frame = {
   delayMs: number
 }
 
+export class CanceledError extends Error { /* empty */ }
+
 
 // TODO the ability to cancel
 export class Sequence {
 
   public readonly config: SequenceConfig = { ...DEFAULT_SEQUENCE_CONFIG }
+  public readonly canvas: HTMLCanvasElement
 
-  protected readonly canvas: HTMLCanvasElement
   private readonly ignoreDelays: boolean
-  private readonly modelConstructors: { [key: string]: () => Model } = {}
+  private readonly modelConstructors: { [key: string]: () => Model } = {} // TODO don't have this
   private readonly imageDataConsumers: FrameConsumerFn[] = []
+  private canceled: boolean = false
 
   protected rootPane: Pane | null = null
 
@@ -56,6 +59,10 @@ export class Sequence {
     this.registerModel('voronoi', () => new Models.Voronoi())
   }
 
+
+  public cancel() {
+    this.canceled = true
+  }
 
   /** Registers a function to receive image data after every drawn frame. */
   public addImageDataConsumer(consumer: FrameConsumerFn) {
@@ -96,6 +103,10 @@ export class Sequence {
 
   /** This should be called in sequence functions to request a frame to be drawn. @see {@link SequenceFn} */
   public async capture(delayScale: number = 1) {
+    if(this.canceled) {
+      throw new CanceledError()
+    }
+
     const delay = this.config.defaultDelayMs * Math.max(0, delayScale)
 
     const drawer: Drawer = this.redraw()

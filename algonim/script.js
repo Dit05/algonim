@@ -85,6 +85,10 @@ async function slideshow() {
   }
 }
 
+function stopSlideshow() {
+  algonim.stopSlideshow()
+}
+
 async function makeGif() {
   showError(undefined)
 
