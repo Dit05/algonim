@@ -2,7 +2,6 @@ import { Point, Size } from '@/gfx/Primitives'
 import { Region } from '@/gfx/Region'
 import { Drawer } from '@/gfx/Drawer'
 import { Model } from '@/models/Model'
-import * as Models from '@/models'
 
 
 /** Describes a {@link Pane} hierarchy. @see {@link Sequence.setLayout} */
@@ -31,16 +30,17 @@ export type Frame = {
   delayMs: number
 }
 
+export class CanceledError extends Error { /* empty */ }
 
-// TODO the ability to cancel
+
 export class Sequence {
 
   public readonly config: SequenceConfig = { ...DEFAULT_SEQUENCE_CONFIG }
+  public readonly canvas: HTMLCanvasElement
 
-  protected readonly canvas: HTMLCanvasElement
   private readonly ignoreDelays: boolean
-  private readonly modelConstructors: { [key: string]: () => Model } = {}
   private readonly imageDataConsumers: FrameConsumerFn[] = []
+  private canceled: boolean = false
 
   protected rootPane: Pane | null = null
 
@@ -48,14 +48,12 @@ export class Sequence {
   public constructor(canvas: HTMLCanvasElement, ignoreDelays: boolean = false) {
     this.canvas = canvas
     this.ignoreDelays = ignoreDelays
-
-    // Register built-in models
-    this.registerModel('code', () => new Models.Code())
-    this.registerModel('graph', () => new Models.Graph())
-    this.registerModel('rainbow', () => new Models.Rainbow())
-    this.registerModel('voronoi', () => new Models.Voronoi())
   }
 
+
+  public cancel() {
+    this.canceled = true
+  }
 
   /** Registers a function to receive image data after every drawn frame. */
   public addImageDataConsumer(consumer: FrameConsumerFn) {
@@ -96,6 +94,10 @@ export class Sequence {
 
   /** This should be called in sequence functions to request a frame to be drawn. @see {@link SequenceFn} */
   public async capture(delayScale: number = 1) {
+    if(this.canceled) {
+      throw new CanceledError()
+    }
+
     const delay = this.config.defaultDelayMs * Math.max(0, delayScale)
 
     const drawer: Drawer = this.redraw()
@@ -114,30 +116,6 @@ export class Sequence {
     return new Promise((resolve) => {
       setTimeout(resolve, this.ignoreDelays ? 0 : delay)
     })
-  }
-
-  /** Retrieves a list of all registered {@link Model}s' names. */
-  public getModelNames(): string[] {
-    const names = []
-    for(let key in this.modelConstructors) {
-      names.push(key)
-    }
-    return names
-  }
-
-  /** Registers a factory function as a {@link Model}. @see {@link createModel} */
-  public registerModel(name: string, ctor: () => Model) {
-    this.modelConstructors[name] = ctor
-  }
-
-  /** Instantiates a registered {@link Model} based on its name. @see {@link getModelNames} */
-  public createModel(name: string): Model | undefined {
-    const ctor = this.modelConstructors[name]
-    if(ctor === undefined) {
-      return undefined
-    } else {
-      return ctor()
-    }
   }
 
   redraw(): Drawer {

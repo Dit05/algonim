@@ -6,8 +6,10 @@ import { TextWrapper, TextAtom, ClipResult, Text, SpaceAtom } from '@/gfx/TextWr
 import * as CONFIG from '@/config'
 
 
+export type TextLike = Text | string
+
 export class Line {
-  public text: string = ''
+  public text: TextLike = ''
   /** Signs present on this line. Note that signs need to refer back to their line, so prefer using {@link Sign.constructor} instead of manipulating this directly, as that will automatically add them to the array. */
   public signs: Sign[] = []
 }
@@ -83,6 +85,13 @@ export class Code extends Model {
   public defaultSignStyle: SignStyle = {
     fontStyle: { fill: 'blue' }
   }
+  /** Defines what char codes are indentation, and how many "ems" they count for. One "em" is the width of an 'm' character. (note: probably won't work with surrogate pairs) */
+  public indentChars: Map<number, number> = function() {
+    const map = new Map<number, number>()
+    map.set(' '.charCodeAt(0), 1)
+    map.set('\t'.charCodeAt(0), 1)
+    return map
+  }()
 
   /** Number of the first visible line. */
   public numberingStart: number = 1
@@ -130,22 +139,61 @@ export class Code extends Model {
     return new Sign(line, this.defaultSignStyle)
   }
 
-  private static measureAndRemoveIndent(text: string): { indent: number, deindented: string } {
-    let indent = 0
-    let removeCount = 0
-    for(let i = 0; i < text.length; i++) {
-      let done = false
-      switch(text[i]) {
-        case ' ': indent += 1; break
-        case '\t': indent += 2; break
-        default: done = true; break
+  private measureAndRemoveIndent(text: TextLike): { indent: number, deindented: Text } {
+    function deindentString(str: string, indentChars: Map<number, number>): { indent: number, deindented: string } {
+      let indent = 0
+      let removeCount = 0
+
+      for(let i = 0; i < str.length; i++) {
+        let done = false
+
+        // TO-DO probably won't work for surrogate pairs
+        const char = str.charCodeAt(i)
+        const value = indentChars.get(char)
+        if(value !== undefined) {
+          indent += value
+        } else {
+          done = true
+        }
+
+        if(done) break
+        else removeCount += 1
       }
-      if(done) break
-      else removeCount += 1
+
+      return {
+        indent: indent,
+        deindented: str.substring(removeCount)
+      }
     }
+
+    if(typeof(text) === 'string') {
+      text = [text]
+    } else {
+      text = text.slice() // Make a copy
+    }
+
+    let totalIndent = 0
+    let sliceStart = 0
+    while(text.length - sliceStart > 0) {
+      const head = text[sliceStart]
+      if(typeof(head) !== 'string') break
+
+      const result = deindentString(head, this.indentChars)
+      totalIndent += result.indent
+
+      if(result.deindented.length <= 0) {
+        sliceStart += 1
+      } else {
+        text[sliceStart] = result.deindented
+        break
+      }
+    }
+
+    if(sliceStart > 0) text = text.slice(sliceStart)
+
     return {
-      indent: indent,
-      deindented: text.substring(removeCount)
+      indent: totalIndent,
+      deindented: text
     }
   }
 
@@ -199,12 +247,11 @@ export class Code extends Model {
         x += this.numberSeparatorMargins.after
       }
 
-      const indentInfo = Code.measureAndRemoveIndent(lineContent)
-      lineContent = indentInfo.deindented
+      const indentInfo = this.measureAndRemoveIndent(lineContent)
       x += indentInfo.indent * em
       const arrowX = x
 
-      const text: Text = [lineContent]
+      const text = indentInfo.deindented
       if(line.signs.length > 0) {
         text.push(new SpaceAtom(Size(this.signSeparation, 0)))
         const spacer = new SpaceAtom(Size(this.signSpacing, 0))

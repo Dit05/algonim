@@ -39,7 +39,8 @@ function loadExample(name) {
 }
 
 function getUserFunction() {
-  const text = document.getElementById('script-area').value
+  let text = document.getElementById('script-area').value
+  text = 'const Algonim = window.Algonim; ' + text
   const result = eval(text)
   if(typeof(result) !== 'function') {
     throw new TypeError("Your code must be an expression that evaluates to a function.")
@@ -62,6 +63,7 @@ function dropHandler(ev) {
     window.Algonim.importEmbedFromGif(files[0])
       .catch((err) => {
         showError(err)
+        throw err
       })
       .then((payload) => {
         const decoder = new TextDecoder()
@@ -83,6 +85,10 @@ async function slideshow() {
   } catch(err) {
     showError(err, true)
   }
+}
+
+function stopSlideshow() {
+  algonim.stopSlideshow()
 }
 
 async function makeGif() {
@@ -118,7 +124,7 @@ const examples = {
   // An example showing off most features.
   seq.config.resolution = { width: 640, height: 480 }
 
-  const code = seq.createModel('code')
+  const code = new Algonim.Models.Code()
   code.setLines([
     'i <- 3',
     'while i>0 do',
@@ -127,29 +133,19 @@ const examples = {
     'done'
   ])
 
-  const fakeConsole = seq.createModel('code')
+  const fakeConsole = new Algonim.Models.Code()
   fakeConsole.numberingStyleOverride = null
   fakeConsole.numberSeparatorStyle = null
   const outputLines = [ 'Output: (totally not a CodeModel)' ]
   fakeConsole.setLines(outputLines)
 
-  const graph = seq.createModel('graph')
-  let node = graph.createNode()
-  node.position.x = 48
-  node.position.y = 48
-  node.value = 149
-
-  let node2 = graph.createNode()
-  node2.connect(node, false)
-  node2.position.x = 128
-  node2.position.y = 192
-
-  let node3 = graph.createNode()
-  node3.value = "lonely node"
-  node3.position.x = 180
-  node3.position.y = 450
-
-  graph.roots = [node, node3]
+  const graph = new Algonim.Models.Graph()
+  //graph.fontStyle.font = '8px sans'
+  graph.setLayout({
+    'node': { pos: [50, 50], value: 149, connect: ['node2', 'node3'] },
+    'node2': { pos: [200, 60], connect: ['node'] },
+    'node3': { pos: [100, 350], value: 'node three' }
+  })
 
   let layout = {
     'split': 'vertical',
@@ -169,8 +165,9 @@ const examples = {
   await seq.capture()
 
   let i = 3
-  const iSign = code.createSign(0)
-  iSign.text = `${i}`
+  const signs = {}
+  signs['i'] = code.createSign(0)
+  signs['i'].text = `${i}`
 
   code.arrowLines = 1
   await seq.capture()
@@ -181,7 +178,7 @@ const examples = {
     fakeConsole.setLines(outputLines)
     await seq.capture()
     i -= 1
-    iSign.text = `${i}`
+    signs['i'].text = `${i}`
     code.arrowLines = 3
     await seq.capture()
     code.arrowLines = 1
@@ -193,7 +190,7 @@ const examples = {
   code.arrowLines = null
   await seq.capture()
 
-  iSign.destroy()
+  signs['i'].destroy()
   code.createSign(4).text = 'Fin.'
   await seq.capture()
 },
@@ -201,7 +198,7 @@ const examples = {
 rainbow: async function(seq) {
   // Generates a single frame with lots of colors for quantization to deal with.
   seq.config.resolution = { width: 512, height: 256 }
-  const rainbow = seq.createModel('rainbow')
+  const rainbow = new Algonim.Models.Rainbow()
   rainbow.step = { x: 4, y: 4 }
   seq.setLayout(rainbow)
   await seq.capture()
@@ -225,7 +222,7 @@ voronoi: async function(seq) {
   }
 
   seq.config.resolution = { width: 480, height: 272 }
-  const voronoi = seq.createModel('voronoi')
+  const voronoi = new Algonim.Models.Voronoi()
   seq.setLayout(voronoi)
   voronoi.step = { x: 2, y: 2 }
 
@@ -249,7 +246,7 @@ voronoi: async function(seq) {
   // Short animation with two frames to test looping.
   seq.config.resolution = { width: 128, height: 64 }
   seq.config.defaultDelayMs = 500 // Five. Hundred. Millisecs.
-  const code = seq.createModel('code')
+  const code = new Algonim.Models.Code()
   seq.setLayout(code)
   code.setLines(['a'])
   await seq.capture()
@@ -260,7 +257,7 @@ voronoi: async function(seq) {
 'text wrapping': async function(seq) {
   // Shows CodeModel's automatic line wrapping.
   seq.config.resolution = { width: 256, height: 512 }
-  const code = seq.createModel('code')
+  const code = new Algonim.Models.Code()
   seq.setLayout(code)
   code.setLines([
     "Hello World!",

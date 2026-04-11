@@ -1,13 +1,13 @@
 import { Drawer } from '@/gfx/Drawer'
 import { Point, Size } from '@/gfx/Primitives'
-import { RasterModel } from './RasterModel'
+import { Raster } from './Raster'
 import { ColorUtil, Color } from '@/gif/Color'
 
 
 /**
 * Draws lots of colors to annoy the GIF encoder.
 */
-export class Rainbow extends RasterModel<Size> {
+export class Rainbow extends Raster<Size> {
 
   protected prepare(drawer: Drawer): Size {
     return drawer.getSize()

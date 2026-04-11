@@ -39,14 +39,14 @@ export class GraphicControl implements Block {
 
     vec.addUint16(Math.max(0, Math.min(Math.round(this.delay), 0xffff)))
 
-    // TODO should it actually be missing when undefined?
+    // TO-DO should it actually be missing when undefined?
     vec.addUint8((this.transparentIndex !== undefined) ? this.transparentIndex : 0)
 
     vec.addUint8(0) // Block terminator
   }
 
   public isInvalidIn(_gif: Gif): RangeError | null {
-    // TODO enhance isInvalidIn?
+    // TO-DO enhance isInvalidIn? This is invalid if it doesn't precede an image.
     return null
   }
   //

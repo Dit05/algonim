@@ -1,6 +1,7 @@
 {
   "entryPoints": ["./src/"],
   "entryPointStrategy": "expand",
+  "exclude": ["**/*.zests.ts"],
   "excludePrivate": true,
   "out": "docs",
   "includeVersion": true,

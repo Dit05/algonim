@@ -287,7 +287,7 @@ export class Drawer {
 
   /** Draws some text. You can use {@link gfx/TextWrapper.TextWrapper} if you need wrapping. */
   public drawText(text: string, position: Point, align: Partial<TextAlign> = {}, style: Partial<FontStyle> = {}) {
-    // TODO account for non-individually customizable stuff like textRendering
+    // TO-DO account for non-individually customizable stuff like textRendering
     const effectiveStyle: FontStyle = Drawer.completeFontStyle(style)
 
     this.doClipped(() => {

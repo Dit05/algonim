@@ -4,9 +4,8 @@ import { Model } from './Model'
 import { ColorUtil, Color } from '@/gif/Color'
 
 
-// TODO export in root module
 /** Helper for making models that draw individual pixels. */
-export abstract class RasterModel<TData> extends Model {
+export abstract class Raster<TData> extends Model {
 
   /** Size of individual colored squares in pixels. Increasing this speeds up drawing. */
   public step: Vector = Vector(1, 1)
