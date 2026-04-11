@@ -1,7 +1,7 @@
 import { Model } from './Model'
 import { Drawer } from '@/gfx/Drawer'
-import { Point, Size, SizeUtil } from '@/gfx/Primitives'
-import { TextAlign, FontStyle, LineStyle, ArrowStyle } from '@/gfx/Styles'
+import { Point, Vector, VectorUtil, Size, SizeUtil } from '@/gfx/Primitives'
+import { DrawStyle, TextAlign, FontStyle, LineStyle, ArrowStyle } from '@/gfx/Styles'
 import { TextWrapper, TextAtom, ClipResult, Text, SpaceAtom } from '@/gfx/TextWrapper'
 import * as CONFIG from '@/config'
 
@@ -14,7 +14,6 @@ export class Line {
   public signs: Sign[] = []
 }
 
-// TODO draw a box around it or something
 /** An extra bit of text that appears after a line. */
 export class Sign implements TextAtom {
 
@@ -45,10 +44,14 @@ export class Sign implements TextAtom {
   // TextAtom
   measure(drawer: Drawer, style: FontStyle): Size {
     // Ignore height
-    return Size(SizeUtil.fromMetricsFont(drawer.measureText(this.text, Sign.ALIGN, style)).width, 0)
+    const size = SizeUtil.fromMetricsActual(drawer.measureText(this.text, Sign.ALIGN, style))
+    return Size(size.width + 2 * this.style.rectStyle.expand, 0)
   }
 
   draw(position: Point, drawer: Drawer, style: FontStyle): void {
+    const size = SizeUtil.fromMetricsActual(drawer.measureText(this.text, Sign.ALIGN, style))
+    const expand = this.style.rectStyle.expand
+    drawer.drawRectangle(VectorUtil.subtract(position, Vector(expand, expand - 2)), SizeUtil.grow(size, expand * 2), this.style.rectStyle.line, this.style.rectStyle.fill)
     drawer.drawText(this.text, position, Sign.ALIGN, { ...style, ...this.style.fontStyle })
   }
 
@@ -59,7 +62,12 @@ export class Sign implements TextAtom {
 }
 
 export type SignStyle = {
-  fontStyle: Partial<FontStyle>
+  fontStyle: Partial<FontStyle>,
+  rectStyle: {
+    expand: number,
+    line: Partial<LineStyle> | null,
+    fill: DrawStyle | null
+  }
 }
 
 export class Code extends Model {
@@ -83,7 +91,12 @@ export class Code extends Model {
   public signSpacing: number = 8
   /** Style applied to newly created `Sign`s. The font style is not inherited from `textStyle`. @see textStyle */
   public defaultSignStyle: SignStyle = {
-    fontStyle: { fill: 'blue' }
+    fontStyle: { fill: 'blue' },
+    rectStyle: {
+      expand: 4,
+      fill: '#2222ff77',
+      line: null
+    }
   }
   /** Defines what char codes are indentation, and how many "ems" they count for. One "em" is the width of an 'm' character. (note: probably won't work with surrogate pairs) */
   public indentChars: Map<number, number> = function() {
@@ -214,7 +227,9 @@ export class Code extends Model {
         break
     }
 
-    const em: number = drawer.measureText('m', {}, this.textStyle).width
+    const mSize: Size = SizeUtil.fromMetricsFont(drawer.measureText('m', {}, this.textStyle))
+    const em: number = mSize.width
+    const minLineHeight: number = mSize.height * this.textHeightFactor
 
     const wrapper = new TextWrapper(drawer)
     wrapper.textHeightFactor = this.textHeightFactor
@@ -262,20 +277,21 @@ export class Code extends Model {
       }
 
       const drawResult = wrapper.drawText(text, Point(x, y), drawer.getSize().width - x, this.textStyle)
+      const lineHeight = Math.max(minLineHeight, drawResult.size.height)
 
       if(this.numberSeparatorStyle !== null && numberSeparatorX !== null) {
         // For some reason, -0.5 yields the most continuous line.
-        drawer.drawLine(Point(numberSeparatorX, y), Point(numberSeparatorX, y + drawResult.size.height - 0.5), this.numberSeparatorStyle)
+        drawer.drawLine(Point(numberSeparatorX, y), Point(numberSeparatorX, y + lineHeight - 0.5), this.numberSeparatorStyle)
       }
 
       if(isArrowLine(i)) {
-        const start = Point(arrowX - this.arrowDistance - this.arrowLength, y + drawResult.size.height / 2)
-        const end = Point(arrowX - this.arrowDistance, y + drawResult.size.height / 2)
+        const start = Point(arrowX - this.arrowDistance - this.arrowLength, y + lineHeight / 2)
+        const end = Point(arrowX - this.arrowDistance, y + lineHeight / 2)
         drawer.drawLine(start, end, this.arrowStyle.line)
         drawer.drawArrowhead(start, end, this.arrowStyle.line, this.arrowStyle.head)
       }
 
-      y += drawResult.size.height
+      y += lineHeight
     }
   }
 
