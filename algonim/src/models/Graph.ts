@@ -125,10 +125,6 @@ export class Graph extends Model {
       const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
       sizes.set(node, textSize)
 
-      if(!node.hideValue) {
-        drawer.drawText(valueStr, node.position, align, this.textStyle)
-      }
-
       const border = node.border || this.defaultBorder
       const borderBounds: Region = border.getBounds(textSize)
 
@@ -136,6 +132,10 @@ export class Graph extends Model {
       const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
         .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
       border.draw(textSize, borderDrawer)
+
+      if(!node.hideValue) {
+        drawer.drawText(valueStr, node.position, align, this.textStyle)
+      }
     }
 
     // Draw edges
