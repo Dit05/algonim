@@ -105,7 +105,8 @@ async function makeGif() {
     allowSmallerTables: Boolean(document.getElementById('gif-allowSmallerTables').checked),
     loopCount: Number(document.getElementById('gif-loop').checked ? Infinity : NaN),
     useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables').checked),
-    embedContent: embed
+    embedContent: embed,
+    onlyDifferences: true
   }
 
   let blob = undefined

@@ -9,6 +9,7 @@ import { SequenceFn, Sequence, Frame, CanceledError } from '@/Sequence'
 import { toCounted, scaleCounts, mergeCounteds, ColorArrays } from '@/gif/ColorReducer'
 import { ColorUtil } from '@/gif/Color'
 import { Parser, BlockSignature } from '@/gif/Parser'
+import { DiffTransformer } from '@/gif/DiffTransformer'
 import * as ColorReducers from '@/gif/color_reducers'
 
 
@@ -26,7 +27,9 @@ export type GifOptions = {
   /** Whether timing info should be logged to the console. */
   logTiming: boolean,
   /** Arbitrary bytes to embed into the image using an Algonim Application Extension block. */
-  embedContent: Uint8Array | undefined
+  embedContent: Uint8Array | undefined,
+  /** Whether to represent only differences in images instead of entire frames. */
+  onlyDifferences: boolean
 }
 
 const DEFAULT_GIF_OPTIONS: GifOptions = {
@@ -36,7 +39,8 @@ const DEFAULT_GIF_OPTIONS: GifOptions = {
   loopCount: undefined,
   encodingBufferSize: 8192,
   logTiming: true,
-  embedContent: undefined
+  embedContent: undefined,
+  onlyDifferences: true
 }
 
 
@@ -93,6 +97,11 @@ export class AlgonimElement extends HTMLElement {
 
   public async recordGif(func: SequenceFn, progressElement: HTMLProgressElement | undefined = undefined, optionsOverrides: Partial<GifOptions> = {}): Promise<Blob> {
     const options: GifOptions = { ...DEFAULT_GIF_OPTIONS, ...optionsOverrides }
+    if(options.colorTableBits <= 1) {
+      // TO-DO separate out cropping into a different transformer, since that part can work without transparency
+      console.warn("onlyDifferences only works if there's more than 1 color table bit.")
+      options.onlyDifferences = false
+    }
 
     const progress = {
       setHidden(hidden: boolean) {
@@ -186,7 +195,7 @@ export class AlgonimElement extends HTMLElement {
           frameArrays[i] = arrays
         }
         const globalArrays = mergeCounteds(frameArrays)
-        gif.globalColorTable = ColorTable.createQuantized(reducer, options.colorTableBits - 1, globalArrays, options.allowSmallerTables)
+        gif.globalColorTable = ColorTable.createQuantized(reducer, options.colorTableBits - 1, globalArrays, options.allowSmallerTables, options.onlyDifferences)
       } else {
         gif.globalColorTable = undefined
       }
@@ -210,6 +219,7 @@ export class AlgonimElement extends HTMLElement {
         gif.blocks.push(loopBlock)
       }
 
+      // Add frames
       times.frames = new Array(frames.length)
       for(let i = 0; i < frames.length; i++) {
         timer = newTimer()
@@ -220,7 +230,7 @@ export class AlgonimElement extends HTMLElement {
         gif.blocks.push(control)
 
         const imageTable: ColorTable = gif.globalColorTable === undefined
-          ? ColorTable.createQuantized(reducer, options.colorTableBits - 1, frame.image, options.allowSmallerTables)
+          ? ColorTable.createQuantized(reducer, options.colorTableBits - 1, frame.image, options.allowSmallerTables, options.onlyDifferences)
           : gif.globalColorTable
 
         const image = Image.fromCanvasImageData(frame.image, imageTable)
@@ -232,6 +242,12 @@ export class AlgonimElement extends HTMLElement {
         await progress.animationFrame()
       }
 
+      // Apply transformations
+      if(options.onlyDifferences) {
+        gif.transform(new DiffTransformer())
+      }
+
+      // Create the actual file
       timer = newTimer()
       const vec = new ByteVector(optionsOverrides.encodingBufferSize)
       const steps = gif.createFileStaged()

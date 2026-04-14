@@ -1,7 +1,7 @@
 import { ByteVector } from '../ByteVector'
 import { Block, Gif } from '../Gif'
 import { ColorTable } from '../ColorTable'
-import { ColorUtil } from '../Color'
+import { Color, ColorUtil } from '../Color'
 import { compress, CompressionFn } from '../VLCLZW'
 import * as CONFIG from '@/config'
 
@@ -80,6 +80,19 @@ export class Image implements Block {
     }
 
     return img
+  }
+
+  /** Gets the effective color at the given position. Returns `undefined` if it's the color table's reserved index. @see {@link ColorTable.reservedIndex} */
+  public colorAt(x: number, y: number): Color | undefined {
+    if(x < 0 || x >= this.width) throw new RangeError('x must be at least 0 and less than this.width.')
+    if(y < 0 || y >= this.height) throw new RangeError('y must be at least 0 and less than this.height.')
+
+    const index = this.indices[(y * this.width) + x]
+    if(index == this.colorTable.reservedIndex) {
+      return undefined
+    } else {
+      return this.colorTable.colors[index]
+    }
   }
 
 

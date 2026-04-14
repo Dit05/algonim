@@ -16,6 +16,8 @@ export class ColorTable {
   public readonly colors: Uint32Array
   /** Whether colors are sorted in order of decreasing importance. */
   public ordered: boolean = false
+  /** Index of a color to never match with {@link getClosestColorIndex}. This is intended to be used with {@link GraphicsControl}. */
+  public reservedIndex: number | undefined = undefined
 
   private searchTree: KDTree | undefined = undefined
 
@@ -40,7 +42,7 @@ export class ColorTable {
     })
   }
 
-  public static createQuantized(reducer: ColorReducer, sizefield: number, colors: ColorArrays | CouldBeIterable<Color> | ImageData, allowSmallerSizefield: boolean = false): ColorTable {
+  public static createQuantized(reducer: ColorReducer, sizefield: number, colors: ColorArrays | CouldBeIterable<Color> | ImageData, allowSmallerSizefield: boolean = false, transparency: boolean = false): ColorTable {
     // Type narrowing my beloved
     if(colors instanceof ImageData) {
       colors = ColorUtil.imageDataToColors(colors)
@@ -55,10 +57,16 @@ export class ColorTable {
     }
     const table = new ColorTable(sizefield)
 
-    if(arrays.colors.length > table.colors.length) {
-      arrays = reducer.reduce(arrays, table.colors.length)
+    let desiredCount = table.colors.length
+    if(transparency) {
+      desiredCount -= 1
+      table.reservedIndex = table.colors.length - 1
     }
-    for(let i = 0; i < table.colors.length; i++) {
+
+    if(arrays.colors.length > desiredCount) {
+      arrays = reducer.reduce(arrays, desiredCount)
+    }
+    for(let i = 0; i < arrays.colors.length; i++) {
       table.colors[i] = arrays.colors[i]
     }
 
@@ -132,8 +140,10 @@ export class ColorTable {
     if(this.searchTree === undefined) {
       const colorTable = this
       this.searchTree = new KDTree(function*() {
-        for(const color of colorTable.colors) {
-          yield colorToPoint(color)
+        for(let i = 0; i < colorTable.colors.length; i++) {
+          if(i != colorTable.reservedIndex) {
+            yield colorToPoint(colorTable.colors[i])
+          }
         }
       }())
     }
