@@ -5,7 +5,7 @@ import { Raster } from './Raster'
 import { KDTree } from '@/util/KDTree'
 
 
-type Data = {
+export type Data = {
   tree: KDTree,
   stringyMap: Map<string, Color>
 }

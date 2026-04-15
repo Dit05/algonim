@@ -6,5 +6,6 @@
   "out": "docs",
   "includeVersion": true,
   "readme": "README.md",
-  "sort": "source-order"
+  "sort": "source-order",
+  "treatWarningsAsErrors": true
 }

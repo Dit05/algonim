@@ -16,7 +16,7 @@ export class ColorTable {
   public readonly colors: Uint32Array
   /** Whether colors are sorted in order of decreasing importance. */
   public ordered: boolean = false
-  /** Index of a color to never match with {@link getClosestColorIndex}. This is intended to be used with {@link GraphicsControl}. */
+  /** Index of a color to never match with {@link getClosestColorIndex}. This is intended to be used with {@link gif/blocks/GraphicControl!GraphicControl}. */
   public reservedIndex: number | undefined = undefined
 
   private searchTree: KDTree | undefined = undefined

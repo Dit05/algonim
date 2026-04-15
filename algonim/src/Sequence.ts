@@ -20,7 +20,7 @@ const DEFAULT_SEQUENCE_CONFIG: SequenceConfig = {
   resolution: Size(640, 480)
 }
 
-/** Plays an animation sequence. @see {@link Algonim!Algonim.slideshow} */
+/** Plays an animation sequence. @see {@link AlgonimElement!AlgonimElement.slideshow} */
 export type SequenceFn = (seq: Sequence) => Promise<void>
 
 /** Can be subscribed to a sequence to receive rendered frames from it. @see {@link Sequence.addImageDataConsumer} */

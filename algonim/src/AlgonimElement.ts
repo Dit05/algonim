@@ -14,7 +14,7 @@ import * as ColorReducers from '@/gif/color_reducers'
 
 
 export type GifOptions = {
-  /** The value of {@link Algonim/gif/ColorTable!ColorTable.sizefield} will be one less than this. */
+  /** The value of {@link gif/ColorTable!ColorTable.sizefield} will be one less than this. */
   colorTableBits: number,
   /** Whether to automatically use color tables smaller than {@link colorTableBits} when possible. */
   allowSmallerTables: boolean,
