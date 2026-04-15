@@ -54,26 +54,34 @@ function dropHandler(ev) {
     ev.preventDefault()
     const files = [...ev.dataTransfer.items]
       .map((item) => item.getAsFile())
-      .filter((file) => file && file.type == 'image/gif')
-
-    if(files.length == 0) {
-      throw new Error("No GIF file has been provided.")
-    }
-
-    window.Algonim.importEmbedFromGif(files[0])
-      .catch((err) => {
-        showError(err)
-        throw err
-      })
-      .then((payload) => {
-        const decoder = new TextDecoder()
-        const str = decoder.decode(payload)
-        document.getElementById('script-area').value = str
-      })
-
+    importGif(files)
   } catch(err) {
     showError(err)
   }
+}
+
+function importButtonPressed() {
+  const input = document.getElementById('file-input')
+  importGif([...input.files])
+}
+
+function importGif(files) {
+  files = files
+    .filter((file) => file && file.type == 'image/gif')
+  if(files.length == 0) {
+    throw new Error("No GIF file has been provided.")
+  }
+
+  window.Algonim.importEmbedFromGif(files[0])
+    .catch((err) => {
+      showError(err)
+      throw err
+    })
+    .then((payload) => {
+      const decoder = new TextDecoder()
+      const str = decoder.decode(payload)
+      document.getElementById('script-area').value = str
+    })
 }
 
 

@@ -42,9 +42,11 @@
             <!-- GIF settings -->
             <button onclick="this.disabled = true; makeGif().finally(() => {this.disabled = false})">Make GIF</button>
             <br>
+            <div style="height: 1em;"></div>
             <label id="drop-zone">
-              Drop or select a GIF to import its code
-              <input type="file" id="file-input" multiple accept="image/*" />
+              Drop a GIF here or select it below to import code<br>
+              <input type="file" id="file-input" accept="image/gif" />
+              <button onclick="importButtonPressed()">Import</button>
             </label>
             <progress id="gif-progress" hidden="true"></progress>
             <div style="height: 1em;"></div>
