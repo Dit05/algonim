@@ -105,7 +105,8 @@ async function makeGif() {
     allowSmallerTables: Boolean(document.getElementById('gif-allowSmallerTables').checked),
     loopCount: Number(document.getElementById('gif-loop').checked ? Infinity : NaN),
     useLocalColorTables: Boolean(document.getElementById('gif-useLocalColorTables').checked),
-    embedContent: embed
+    embedContent: embed,
+    onlyDifferences: true
   }
 
   let blob = undefined
@@ -136,7 +137,7 @@ const examples = {
   const fakeConsole = new Algonim.Models.Code()
   fakeConsole.numberingStyleOverride = null
   fakeConsole.numberSeparatorStyle = null
-  const outputLines = [ 'Output: (totally not a CodeModel)' ]
+  const outputLines = [ 'Output:' ]
   fakeConsole.setLines(outputLines)
 
   const graph = new Algonim.Models.Graph()
@@ -149,7 +150,7 @@ const examples = {
 
   let layout = {
     'split': 'vertical',
-    'ratio': 0.4,
+    'ratio': 0.5,
     'left': graph,
     'right': {
       'split': 'horizontal',
@@ -177,9 +178,10 @@ const examples = {
     outputLines.push(`${i}`)
     fakeConsole.setLines(outputLines)
     await seq.capture()
+    code.arrowLines = 3
+    await seq.capture()
     i -= 1
     signs['i'].text = `${i}`
-    code.arrowLines = 3
     await seq.capture()
     code.arrowLines = 1
     await seq.capture()

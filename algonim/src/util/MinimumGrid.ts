@@ -22,13 +22,13 @@ export class MinimumGrid {
   /** Side length of the grid. */
   public readonly size: number
 
-  readonly layers: Layer[] = []
+  private readonly layers: Layer[] = []
 
   /** Stores the dirty indices of the lowest layer. */
-  readonly dirty: Set<number> = new Set()
+  private readonly dirty: Set<number> = new Set()
 
 
-  /** Creates a {@link size}x{@link size} grid. */
+  /** Creates a grid with the given side length. */
   public constructor(size: number) {
     this.size = size
     this.data = new Float64Array(size * size)
@@ -97,14 +97,14 @@ export class MinimumGrid {
   }
 
 
-  /** Fills an entire column with {@link value}. */
+  /** Fills an entire column with the given value. */
   public fillCol(col: number, value: number) {
     for(let i = 0; i < this.size; i++) {
       this.data[this.index(col, i)] = value
     }
   }
 
-  /** Fills an entire row with {@link value}. */
+  /** Fills an entire row with the given value. */
   public fillRow(row: number, value: number) {
     this.data.fill(value, row * this.size, (row + 1) * this.size)
   }

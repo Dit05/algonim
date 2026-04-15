@@ -94,7 +94,7 @@ export class Parser {
         case 0x2c: {
           // Image Descriptor
           info = { type: 'image descriptor' }
-          skipColorTable(bytes[index + 11])
+          skipColorTable(bytes[index + 9])
           index += 11
           skipData()
         } break

@@ -108,6 +108,16 @@ export class Gif {
   }
 
 
+  // TO-DO make transformers work with generators instead
+  // also make Transformer a function type instead of an interface
+  public transform(transformer: Transformer) {
+    const newBlocks = transformer.transform(this.blocks)
+    this.blocks.length = 0
+    for(const block of newBlocks) {
+      this.blocks.push(block)
+    }
+  }
+
   /** Encodes this GIF as binary data into the given ByteVector. */
   public createFile(vec: ByteVector) {
     for(const step of this.createFileStaged()) {
@@ -162,4 +172,9 @@ export class Gif {
     finishSubBlock() // Mandatory 0-size sub-block at the end
   }
 
+}
+
+
+export interface Transformer {
+  transform(blocks: Block[]): Block[]
 }

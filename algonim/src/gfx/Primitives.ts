@@ -69,6 +69,10 @@ export class SizeUtil {
     return Size(s.width - amount, s.height - amount)
   }
 
+  public static grow(s: Size, amount: number): Size {
+    return Size(s.width + amount, s.height + amount)
+  }
+
   public static scale(s: Size, factor: number): Size {
     return Size(s.width * factor, s.height * factor)
   }

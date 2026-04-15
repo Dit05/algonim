@@ -1,3 +1,5 @@
+/** @packageDocumentation This is the root module that becomes available as `window.Algonim`. */
+
 // Exports
 export * from '@/AlgonimElement'
 import * as models from '@/models'; export const Models = models

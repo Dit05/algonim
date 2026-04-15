@@ -19,6 +19,8 @@ export class Node {
   public position: Point = Point(0, 0)
   /** Content drawn in the node. */
   public value: any = null
+  /** Whether to hide the value. Useful if the value is not always relevant. */
+  public hideValue: boolean = false
 
   /** Border around {@link value}. {@link Border} is designed to be stateless, so multiple nodes are free to share border instances. */
   public border: Border | null = null
@@ -68,12 +70,14 @@ export class Graph extends Model {
   /** Creates and connects nodes based on a layout object. Also sets these as the roots. */
   public setLayout(layout: Layout): { [key: string]: Node } {
     const nodes: { [key: string]: Node } = {}
+    const roots: Node[] = []
 
     for(const key in layout) {
       const node = this.createNode()
       node.value = layout[key].value
       node.position = { x: layout[key].pos[0], y: layout[key].pos[1] }
       nodes[key] = node
+      roots.push(node)
     }
 
     for(const key in layout) {
@@ -87,7 +91,7 @@ export class Graph extends Model {
       }
     }
 
-    this.roots = Object.values(nodes)
+    this.roots = roots
     return nodes
   }
 
@@ -114,14 +118,12 @@ export class Graph extends Model {
     for(const node of nodes) {
       ids.set(ids.size, node)
 
-      const str = String(node.value)
+      const valueStr = String(node.value)
       const align: TextAlign = { align: 'center', baseline: 'middle' }
 
-      const metrics = drawer.measureText(str, align, this.textStyle)
+      const metrics = drawer.measureText(valueStr, align, this.textStyle)
       const textSize = Size(metrics.width, metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)
       sizes.set(node, textSize)
-
-      drawer.drawText(str, node.position, align, this.textStyle)
 
       const border = node.border || this.defaultBorder
       const borderBounds: Region = border.getBounds(textSize)
@@ -130,6 +132,10 @@ export class Graph extends Model {
       const borderDrawer = drawer.subregion(Region.fromStartEnd(corner, VectorUtil.add(corner, SizeUtil.toVector(borderBounds.size))))
         .withTranslatedOrigin(VectorUtil.scale(borderBounds.origin, -1))
       border.draw(textSize, borderDrawer)
+
+      if(!node.hideValue) {
+        drawer.drawText(valueStr, node.position, align, this.textStyle)
+      }
     }
 
     // Draw edges
@@ -144,10 +150,10 @@ export class Graph extends Model {
         let endPos = other.position
 
         const startAngle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x)
-        startPos = VectorUtil.add(startPos, this.defaultBorder.getBoundaryPoint(sizes.get(node), startAngle))
+        startPos = VectorUtil.add(startPos, (node.border ?? this.defaultBorder).getBoundaryPoint(sizes.get(node), startAngle))
 
         const endAngle = Math.atan2(startPos.y - endPos.y, startPos.x - endPos.x)
-        endPos = VectorUtil.add(endPos, this.defaultBorder.getBoundaryPoint(sizes.get(other), endAngle))
+        endPos = VectorUtil.add(endPos, (other.border ?? this.defaultBorder).getBoundaryPoint(sizes.get(other), endAngle))
 
         let skip = false
         if(other.connections.has(node)) {
