@@ -142,11 +142,15 @@ const examples = {
 
   const graph = new Algonim.Models.Graph()
   //graph.fontStyle.font = '8px sans'
-  graph.setLayout({
-    'node': { pos: [50, 50], value: 149, connect: ['node2', 'node3'] },
-    'node2': { pos: [200, 60], connect: ['node'] },
+  const nodes = graph.setLayout({
+    'node1': { pos: [50, 50], value: 149, connect: ['node2', 'node3'] },
+    'node2': { pos: [200, 60], connect: ['node1'] },
     'node3': { pos: [100, 350], value: 'node three' }
   })
+  const border = new Algonim.EllipseBorder()
+  border.forceAspectRatio = 1
+  border.line = { stroke: 'red', lineWidth: 2 }
+  nodes['node1'].border = border
 
   let layout = {
     'split': 'vertical',
